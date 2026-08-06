@@ -93,7 +93,7 @@ let liveStreamState = {
   title: "Exclusive Live Session with Goddess Layla",
   description: "Exclusive live stream preview. Enter my VIP sanctuary. Reserved for verified devotees.",
   price: "20.00 €",
-  streamUrl: "https://i.imgur.com/qaGrKvw.mp4",
+  streamUrl: "https://i.imgur.com/m0CSW44.mp4",
   updatedAt: Date.now()
 };
 

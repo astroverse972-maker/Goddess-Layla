@@ -38,13 +38,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       if (autoPlay) {
-        videoRef.current.play().catch(() => {});
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.log('Autoplay handled:', err);
+          });
+        }
       }
     }
   }, [src, autoPlay]);
 
   if (hasError && imgurId) {
-    // If direct HTML5 video blocked by referrer/CORS, fallback to Imgur embed iframe
     return (
       <div className="relative w-full h-full bg-black flex items-center justify-center">
         <iframe
@@ -69,15 +73,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       playsInline
       preload="auto"
       referrerPolicy="no-referrer"
-      crossOrigin="anonymous"
       onError={() => setHasError(true)}
       onEnded={onEnded}
       className={className}
     >
       <source src={directMp4} type="video/mp4" referrerPolicy="no-referrer" />
-      {imgurId && (
-        <source src={`https://i.imgur.com/${imgurId}.gifv`} type="video/mp4" referrerPolicy="no-referrer" />
-      )}
     </video>
   );
 };
+

@@ -17,24 +17,14 @@ interface LiveModalProps {
 
 export const LiveModal: React.FC<LiveModalProps> = ({ isOpen, onClose, liveState }) => {
   const [hasAccess, setHasAccess] = useState(false);
-  const [viewers, setViewers] = useState(184);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const isLive = liveState?.isLive ?? false;
 
   useEffect(() => {
-    if (!isOpen || !isLive) return;
-    const interval = setInterval(() => {
-      const nextViewers = Math.floor(Math.random() * (285 - 130 + 1)) + 130;
-      setViewers(nextViewers);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isOpen, isLive]);
-
-  useEffect(() => {
-    if (isOpen && videoRef.current && isLive) {
+    if (isOpen && videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
-  }, [isOpen, hasAccess, isLive]);
+  }, [isOpen, hasAccess]);
 
   if (!isOpen) return null;
 
@@ -60,7 +50,7 @@ export const LiveModal: React.FC<LiveModalProps> = ({ isOpen, onClose, liveState
             {isLive && (
               <div className="flex items-center gap-1.5 text-xs text-gray-200 font-medium">
                 <Users className="w-3.5 h-3.5 text-white" />
-                <span>{viewers} watching</span>
+                <span>184 watching</span>
               </div>
             )}
             <button
@@ -83,13 +73,12 @@ export const LiveModal: React.FC<LiveModalProps> = ({ isOpen, onClose, liveState
                 key={`live-stream-${hasAccess ? 'unlocked' : 'preview'}`}
                 poster={LIVE_PREVIEW_IMG}
                 controls={hasAccess && isLive}
-                autoPlay={isLive}
+                autoPlay
                 loop
                 muted={!hasAccess || !isLive}
                 playsInline
                 preload="auto"
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 className={`w-full h-full object-cover ${!hasAccess || !isLive ? 'pointer-events-none' : ''}`}
               >
                 <source src={liveState?.streamUrl || LIVE_PREVIEW_VIDEO} type="video/mp4" referrerPolicy="no-referrer" />

@@ -14,8 +14,8 @@ export interface CollectionItem {
 }
 
 export const AVATAR_IMG = 'https://i.imgur.com/g5fQwuf.jpg';
-export const LIVE_PREVIEW_VIDEO = 'https://i.imgur.com/v9OkyIi.mp4';
-export const LIVE_PREVIEW_IMG = 'https://i.imgur.com/v9OkyIi.jpg';
+export const LIVE_PREVIEW_VIDEO = 'https://i.imgur.com/m0CSW44.mp4';
+export const LIVE_PREVIEW_IMG = 'https://i.imgur.com/m0CSW44.jpg';
 
 export const GALLERY_SLIDES = [
   'https://i.imgur.com/STRpELi.jpg',

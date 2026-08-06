@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Menu, X as CloseIcon, CreditCard, Mail, Film, Gift, Send, Crown } from 'lucide-react';
+import { Search, Menu, X as CloseIcon, CreditCard, Mail, Film, Gift, Send } from 'lucide-react';
 import { SOCIAL_LINKS } from '../data/collectionData';
 
 interface NavbarProps {

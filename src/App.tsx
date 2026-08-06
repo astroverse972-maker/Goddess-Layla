@@ -29,25 +29,35 @@ export function App() {
     title: 'Exclusive Live Session with Goddess Layla',
     description: 'Exclusive live stream preview. Enter my VIP sanctuary. Reserved for verified devotees.',
     price: '20.00 €',
-    streamUrl: 'https://i.imgur.com/qaGrKvw.mp4',
+    streamUrl: 'https://i.imgur.com/m0CSW44.mp4',
   });
 
   // Custom Uploaded Media Items
   const [customMedia, setCustomMedia] = useState<CollectionItem[]>([]);
 
-  // Fetch live stream status and uploaded media on load
+  // Fetch live stream status and uploaded media on load with resilient fallback
   const fetchServerState = () => {
     fetch('/api/live-status')
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && typeof data.isLive === 'boolean') {
           setLiveState(data);
+        } else {
+          const savedLocal = localStorage.getItem('goddess_live_state');
+          if (savedLocal) {
+            try { setLiveState(JSON.parse(savedLocal)); } catch (e) {}
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        const savedLocal = localStorage.getItem('goddess_live_state');
+        if (savedLocal) {
+          try { setLiveState(JSON.parse(savedLocal)); } catch (e) {}
+        }
+      });
 
     fetch('/api/custom-media')
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (Array.isArray(data)) {
           setCustomMedia(data);
