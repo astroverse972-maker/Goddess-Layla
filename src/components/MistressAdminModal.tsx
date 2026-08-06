@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Radio, Lock, CheckCircle2, AlertCircle, Plus, Settings, Link2, Image, Check, Database, Sparkles } from 'lucide-react';
+import { X, Radio, Lock, CheckCircle2, AlertCircle, Plus, Link2, Image, Check, Upload } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabaseClient';
 
 interface MistressAdminModalProps {
@@ -28,8 +28,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Active Tab: strictly 'live' | 'upload_video'
-  const [activeTab, setActiveTab] = useState<'live' | 'upload_video'>('live');
+  // Active Tab: strictly 'upload_video' first, then 'live'
+  const [activeTab, setActiveTab] = useState<'upload_video' | 'live'>('upload_video');
 
   // Live Stream Control State
   const [isLive, setIsLive] = useState(currentLiveState.isLive);
@@ -49,7 +49,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [useCustomThumbnail, setUseCustomThumbnail] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   
-  const [category, setCategory] = useState('Femdom & Control');
+  const [category, setCategory] = useState('Exclusive Session');
   const [videoDescription, setVideoDescription] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(['exclusive', 'goddesslayla', 'vip']);
@@ -131,29 +131,19 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       createdAt: new Date().toISOString()
     };
 
-    let sbStatusText = '';
-
-    // 1. Send to Express API endpoint (which handles server-side Supabase write)
+    // 1. Send to Express API endpoint
     try {
-      const res = await fetch('/api/custom-media', {
+      await fetch('/api/custom-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (data?.supabaseResult?.saved) {
-          sbStatusText = ' ✓ Stored in Supabase Database!';
-        } else if (data?.supabaseResult?.message) {
-          sbStatusText = ` (${data.supabaseResult.message})`;
-        }
-      }
     } catch (err) {}
 
     // 2. Direct Supabase write from client
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('content_submissions').insert({
+      await supabase.from('content_submissions').insert({
         title: payload.title,
         price: payload.price,
         tags: payload.tags,
@@ -163,13 +153,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         status: 'published',
         created_at: payload.createdAt
       });
-
-      if (!error) {
-        sbStatusText = ' ✓ Stored in Supabase Database!';
-      }
-    } catch (sbErr: any) {
-      console.warn('Supabase client notice:', sbErr);
-    }
+    } catch (sbErr) {}
 
     // 3. Local storage fallback
     try {
@@ -181,7 +165,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       localStorage.setItem('goddess_custom_videos', JSON.stringify(existingLocal));
     } catch (lsErr) {}
 
-    setPostSuccessMsg(`Video published! ${sbStatusText}`);
+    setPostSuccessMsg('Thank you, Video will appear in page after verification');
     setVideoTitle('');
     setDriveLink('');
     setVideoDescription('');
@@ -236,29 +220,28 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
       setLiveSuccessMsg(
         newState.isLive
-          ? 'Goddess Layla is NOW LIVE on the site'
-          : 'Site status set to Offline'
+          ? 'Live status set to ONLINE'
+          : 'Live status set to OFFLINE'
       );
       setIsUpdatingLive(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans text-white animate-fade-in">
-      <div className="relative max-w-2xl w-full bg-neutral-950/95 rounded-3xl overflow-hidden shadow-2xl my-auto border border-amber-500/30 transition-all duration-300">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans text-white">
+      <div className="relative max-w-xl w-full bg-black rounded-2xl overflow-hidden shadow-2xl my-auto border border-neutral-800 transition-all duration-200">
         
-        {/* Modal Header Bar - Luxury Dark Gold */}
-        <div className="px-6 py-4 bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 text-white flex items-center justify-between border-b border-amber-500/20">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-amber-400 animate-spin-slow shrink-0" style={{ width: '20px', height: '20px' }} />
-            <span className="font-black text-sm sm:text-base uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-rose-300 to-amber-400">
-              GODDESS LAYLA — ADMIN PORTAL
+        {/* Modal Header Bar - Minimal Black & White */}
+        <div className="px-6 py-4 bg-neutral-950 text-white flex items-center justify-between border-b border-neutral-800">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sm tracking-widest uppercase text-white">
+              ADMIN PORTAL
             </span>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-all cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition-all cursor-pointer"
             aria-label="Close"
           >
             <X className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
@@ -268,17 +251,17 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         {/* Content Area */}
         {!isAuthenticated ? (
           /* Authentication Form */
-          <div className="p-8 sm:p-12 space-y-6 text-center max-w-md mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-600 to-rose-600 text-white flex items-center justify-center mx-auto shadow-xl border border-amber-400/30">
-              <Lock className="w-8 h-8 text-amber-100" style={{ width: '32px', height: '32px' }} />
+          <div className="p-8 sm:p-10 space-y-6 text-center max-w-sm mx-auto">
+            <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 text-white flex items-center justify-center mx-auto">
+              <Lock className="w-5 h-5 text-white" style={{ width: '20px', height: '20px' }} />
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-white uppercase tracking-wider">
-                Management Login
+              <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+                Admin Authentication
               </h3>
               <p className="text-xs text-neutral-400 font-medium">
-                Enter passcode to access Goddess Layla's control panel
+                Enter your passcode to access the control panel
               </p>
             </div>
 
@@ -287,175 +270,68 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 type="password"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter Admin Passcode"
-                className="w-full px-4 py-3.5 rounded-2xl bg-neutral-900 border border-neutral-700 text-white text-center font-bold text-sm focus:border-amber-400 focus:outline-none transition-all placeholder-neutral-500"
+                placeholder="Enter Passcode"
+                className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-center font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-500"
               />
 
               {authError && (
-                <p className="text-xs font-bold text-rose-300 bg-rose-950/60 p-3 rounded-xl border border-rose-800/60">
+                <p className="text-xs font-semibold text-neutral-300 bg-neutral-900 p-3 rounded-xl border border-neutral-700">
                   {authError}
                 </p>
               )}
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-full bg-gradient-to-r from-amber-500 via-rose-600 to-amber-500 text-white font-black text-xs uppercase tracking-widest shadow-xl hover:opacity-90 transition-all cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer"
               >
-                Unlock Control Panel
+                Access Control Panel
               </button>
             </form>
           </div>
         ) : (
-          /* Dashboard: GO LIVE and UPLOAD VIDEO */
-          <div className="p-5 sm:p-7 space-y-6 max-h-[85vh] overflow-y-auto">
+          /* Dashboard: UPLOAD VIDEO FIRST, then LIVE STREAM */
+          <div className="p-5 sm:p-6 space-y-6 max-h-[85vh] overflow-y-auto">
             
-            {/* Header Navigation Tabs */}
-            <div className="grid grid-cols-2 gap-3 bg-neutral-900/90 p-1.5 rounded-2xl border border-neutral-800">
+            {/* Header Navigation Tabs - Upload Video First */}
+            <div className="grid grid-cols-2 gap-2 bg-neutral-950 p-1.5 rounded-xl border border-neutral-800">
+              <button
+                onClick={() => setActiveTab('upload_video')}
+                className={`py-3 rounded-lg font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider ${
+                  activeTab === 'upload_video'
+                    ? 'bg-white text-black shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                }`}
+              >
+                <Upload className="w-4 h-4 shrink-0" style={{ width: '16px', height: '16px' }} />
+                <span>Upload Video</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('live')}
-                className={`py-3.5 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider ${
+                className={`py-3 rounded-lg font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider ${
                   activeTab === 'live'
-                    ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg'
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                    ? 'bg-white text-black shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
                 }`}
               >
                 <Radio className="w-4 h-4 shrink-0" style={{ width: '16px', height: '16px' }} />
-                <span>Go Live Status</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('upload_video')}
-                className={`py-3.5 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider ${
-                  activeTab === 'upload_video'
-                    ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg'
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
-                }`}
-              >
-                <Plus className="w-4 h-4 shrink-0" style={{ width: '16px', height: '16px' }} />
-                <span>Upload Video</span>
+                <span>Live Stream</span>
               </button>
             </div>
 
-            {/* TAB 1: GO LIVE */}
-            {activeTab === 'live' && (
-              <form onSubmit={handleSaveLiveStatus} className="space-y-5 text-left">
-                
-                {/* Live Stream Status Toggle Box */}
-                <div className="p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1 text-center sm:text-left">
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-300 block">
-                      Live Stream Status
-                    </span>
-                    <p className="text-xs text-neutral-400">
-                      {isLive
-                        ? 'Site status is ONLINE (Live Banner Active)'
-                        : 'Site status is set to OFFLINE'}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsLive(!isLive)}
-                    className={`px-6 py-3 rounded-full font-black text-xs flex items-center gap-2 transition-all cursor-pointer border ${
-                      isLive
-                        ? 'bg-rose-600 text-white border-rose-400 shadow-lg shadow-rose-950/50'
-                        : 'bg-neutral-800 text-neutral-300 border-neutral-700'
-                    }`}
-                  >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isLive ? 'bg-white animate-ping' : 'bg-neutral-500'}`}></span>
-                    <span>
-                      {isLive ? 'LIVE NOW' : 'SET OFFLINE'}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
-                      Live Session Title
-                    </label>
-                    <input
-                      type="text"
-                      value={liveTitle}
-                      onChange={(e) => setLiveTitle(e.target.value)}
-                      placeholder="e.g. Exclusive Live Session with Goddess Layla"
-                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-amber-400 focus:outline-none transition-all placeholder-neutral-600"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
-                        Price (€)
-                      </label>
-                      <input
-                        type="text"
-                        value={livePrice}
-                        onChange={(e) => setLivePrice(e.target.value)}
-                        placeholder="20.00 €"
-                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-amber-400 focus:outline-none transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
-                        Stream Source Video URL
-                      </label>
-                      <input
-                        type="text"
-                        value={liveStreamUrl}
-                        onChange={(e) => setLiveStreamUrl(e.target.value)}
-                        placeholder="https://i.imgur.com/m0CSW44.mp4"
-                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-mono text-white focus:border-amber-400 focus:outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
-                      Stream Description
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={liveDesc}
-                      onChange={(e) => setLiveDesc(e.target.value)}
-                      placeholder="VIP stream details..."
-                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-amber-400 focus:outline-none resize-none transition-all"
-                    />
-                  </div>
-                </div>
-
-                {liveSuccessMsg && (
-                  <div className="p-4 rounded-xl bg-emerald-950/80 text-emerald-300 text-xs font-bold flex items-center gap-2 border border-emerald-800/60">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" style={{ width: '16px', height: '16px' }} />
-                    <span>{liveSuccessMsg}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isUpdatingLive}
-                  className="w-full py-4 rounded-full bg-gradient-to-r from-amber-500 via-rose-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider shadow-lg hover:opacity-90 transition-all cursor-pointer"
-                >
-                  {isUpdatingLive ? 'Updating Status...' : 'Apply Live Status Changes'}
-                </button>
-
-              </form>
-            )}
-
-            {/* TAB 2: UPLOAD VIDEO */}
+            {/* TAB 1: UPLOAD VIDEO */}
             {activeTab === 'upload_video' && (
-              <div className="space-y-6 text-left">
+              <div className="space-y-5 text-left">
                 
                 {postSuccessMsg && (
-                  <div className="p-4 rounded-2xl bg-emerald-950/90 text-emerald-200 border border-emerald-700/60 space-y-1 shadow-xl">
+                  <div className="p-4 rounded-xl bg-neutral-900 text-white border border-neutral-700 space-y-1">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" style={{ width: '20px', height: '20px' }} />
-                      <h4 className="font-black text-sm">
-                        Video Published!
+                      <CheckCircle2 className="w-5 h-5 text-white shrink-0" style={{ width: '20px', height: '20px' }} />
+                      <h4 className="font-bold text-sm">
+                        Submission Received
                       </h4>
                     </div>
-                    <p className="text-xs text-emerald-300/90 font-medium pl-7">
+                    <p className="text-xs text-neutral-300 font-medium pl-7">
                       {postSuccessMsg}
                     </p>
                   </div>
@@ -465,7 +341,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   
                   {/* Video Title */}
                   <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
                       Video Title *
                     </label>
                     <input
@@ -473,15 +349,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       required
                       value={videoTitle}
                       onChange={(e) => setVideoTitle(e.target.value)}
-                      placeholder="e.g. Exclusive Dominance Session"
-                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-amber-400 focus:outline-none transition-all placeholder-neutral-600"
+                      placeholder="e.g. Exclusive Video Session"
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all placeholder-neutral-500"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Price */}
                     <div>
-                      <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
+                      <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
                         Price (€) *
                       </label>
                       <input
@@ -490,29 +366,29 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={videoPrice}
                         onChange={(e) => setVideoPrice(e.target.value)}
                         placeholder="25.00"
-                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-amber-400 focus:outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
                       />
                     </div>
 
                     {/* Category */}
                     <div>
-                      <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
+                      <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
                         Category
                       </label>
                       <input
                         type="text"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        placeholder="e.g. Femdom & Control"
-                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-amber-400 focus:outline-none transition-all"
+                        placeholder="e.g. Exclusive Session"
+                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Google Drive Public Link */}
                   <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1 flex items-center gap-1.5">
-                      <Link2 className="w-3.5 h-3.5 text-amber-400 shrink-0" style={{ width: '14px', height: '14px' }} />
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1 flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" style={{ width: '14px', height: '14px' }} />
                       <span>Video Source (Google Drive Public Link) *</span>
                     </label>
                     <input
@@ -521,18 +397,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={driveLink}
                       onChange={(e) => setDriveLink(e.target.value)}
                       placeholder="https://drive.google.com/file/d/1ABC123.../view?usp=sharing"
-                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-mono text-white focus:border-amber-400 focus:outline-none transition-all placeholder-neutral-600"
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all placeholder-neutral-500"
                     />
-                    <p className="text-[11px] text-neutral-500 mt-1">
-                      Paste a public Google Drive video link.
-                    </p>
                   </div>
 
                   {/* Custom Thumbnail Checkbox */}
-                  <div className="p-4 rounded-xl bg-neutral-900/90 border border-neutral-800 space-y-3">
+                  <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
                     <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <div className={`w-5 h-5 rounded-md border border-amber-500/50 flex items-center justify-center transition-all ${useCustomThumbnail ? 'bg-amber-500 text-black' : 'bg-neutral-800 text-transparent'}`}>
-                        <Check className="w-3.5 h-3.5 stroke-[3]" style={{ width: '14px', height: '14px' }} />
+                      <div className={`w-4 h-4 rounded border border-neutral-600 flex items-center justify-center transition-all ${useCustomThumbnail ? 'bg-white text-black' : 'bg-neutral-800 text-transparent'}`}>
+                        <Check className="w-3 h-3 stroke-[3]" style={{ width: '12px', height: '12px' }} />
                       </div>
                       <input
                         type="checkbox"
@@ -547,8 +420,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                     {useCustomThumbnail && (
                       <div className="pt-2">
-                        <label className="text-xs font-black text-neutral-300 block uppercase mb-1 flex items-center gap-1.5">
-                          <Image className="w-3.5 h-3.5 text-amber-400 shrink-0" style={{ width: '14px', height: '14px' }} />
+                        <label className="text-xs font-bold text-neutral-300 block uppercase mb-1 flex items-center gap-1.5">
+                          <Image className="w-3.5 h-3.5 text-neutral-400 shrink-0" style={{ width: '14px', height: '14px' }} />
                           <span>Custom Thumbnail Image URL</span>
                         </label>
                         <input
@@ -556,7 +429,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           value={thumbnailUrl}
                           onChange={(e) => setThumbnailUrl(e.target.value)}
                           placeholder="https://images.unsplash.com/photo-... or image URL"
-                          className="w-full px-4 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs font-mono text-white focus:border-amber-400 focus:outline-none transition-all"
+                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
                         />
                       </div>
                     )}
@@ -564,7 +437,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                   {/* Tags Manager */}
                   <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
                       Tags
                     </label>
                     <div className="flex items-center gap-2 mb-2">
@@ -574,7 +447,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={handleTagKeyDown}
                         placeholder="Type tag & press Enter"
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-amber-400 focus:outline-none transition-all placeholder-neutral-600"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-white focus:outline-none transition-all placeholder-neutral-500"
                       />
                       <button
                         type="button"
@@ -589,13 +462,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       {tags.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-800 text-amber-300 text-[11px] font-bold border border-amber-500/20"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 text-neutral-200 text-[11px] font-bold border border-neutral-700"
                         >
                           <span>#{t}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveTag(t)}
-                            className="hover:text-rose-400 text-neutral-400 cursor-pointer text-xs"
+                            className="hover:text-white text-neutral-400 cursor-pointer text-xs"
                           >
                             ✕
                           </button>
@@ -606,7 +479,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                   {/* Video Description */}
                   <div>
-                    <label className="text-xs font-black text-neutral-300 block uppercase mb-1">
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
                       Description
                     </label>
                     <textarea
@@ -614,13 +487,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={videoDescription}
                       onChange={(e) => setVideoDescription(e.target.value)}
                       placeholder="Details about this session..."
-                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-amber-400 focus:outline-none resize-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-white focus:outline-none resize-none transition-all"
                     />
                   </div>
 
                   {postErrorMsg && (
-                    <div className="p-3.5 rounded-xl bg-rose-950/80 text-rose-300 text-xs font-bold flex items-center gap-2 border border-rose-800/60">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" style={{ width: '16px', height: '16px' }} />
+                    <div className="p-3.5 rounded-xl bg-neutral-900 text-neutral-200 text-xs font-bold flex items-center gap-2 border border-neutral-700">
+                      <AlertCircle className="w-4 h-4 text-white shrink-0" style={{ width: '16px', height: '16px' }} />
                       <span>{postErrorMsg}</span>
                     </div>
                   )}
@@ -628,14 +501,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   <button
                     type="submit"
                     disabled={isPosting}
-                    className="w-full py-4 rounded-full bg-gradient-to-r from-amber-500 via-rose-600 to-amber-500 text-white font-black text-xs uppercase tracking-widest shadow-xl hover:opacity-90 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
                     {isPosting ? (
-                      <span>Publishing Video...</span>
+                      <span>Uploading Video...</span>
                     ) : (
                       <>
-                        <Plus className="w-4 h-4 text-white shrink-0" style={{ width: '16px', height: '16px' }} />
-                        <span>Publish Video to Site & Database</span>
+                        <Plus className="w-4 h-4 text-black shrink-0" style={{ width: '16px', height: '16px' }} />
+                        <span>Upload Video</span>
                       </>
                     )}
                   </button>
@@ -643,6 +516,113 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </form>
 
               </div>
+            )}
+
+            {/* TAB 2: LIVE STREAM */}
+            {activeTab === 'live' && (
+              <form onSubmit={handleSaveLiveStatus} className="space-y-5 text-left">
+                
+                {/* Live Stream Status Toggle Box */}
+                <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <span className="text-xs font-bold uppercase tracking-wider text-white block">
+                      Live Stream Status
+                    </span>
+                    <p className="text-xs text-neutral-400">
+                      {isLive
+                        ? 'Status is currently ONLINE'
+                        : 'Status is currently OFFLINE'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsLive(!isLive)}
+                    className={`px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition-all cursor-pointer border ${
+                      isLive
+                        ? 'bg-white text-black border-white'
+                        : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-white'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-black' : 'bg-neutral-500'}`}></span>
+                    <span>
+                      {isLive ? 'LIVE NOW' : 'SET OFFLINE'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
+                      Live Session Title
+                    </label>
+                    <input
+                      type="text"
+                      value={liveTitle}
+                      onChange={(e) => setLiveTitle(e.target.value)}
+                      placeholder="e.g. Exclusive Live Session"
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all placeholder-neutral-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
+                        Price (€)
+                      </label>
+                      <input
+                        type="text"
+                        value={livePrice}
+                        onChange={(e) => setLivePrice(e.target.value)}
+                        placeholder="20.00 €"
+                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
+                        Stream Source Video URL
+                      </label>
+                      <input
+                        type="text"
+                        value={liveStreamUrl}
+                        onChange={(e) => setLiveStreamUrl(e.target.value)}
+                        placeholder="https://i.imgur.com/m0CSW44.mp4"
+                        className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block uppercase mb-1">
+                      Stream Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={liveDesc}
+                      onChange={(e) => setLiveDesc(e.target.value)}
+                      placeholder="Stream details..."
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs font-medium text-white focus:border-white focus:outline-none resize-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                {liveSuccessMsg && (
+                  <div className="p-4 rounded-xl bg-neutral-900 text-white text-xs font-bold flex items-center gap-2 border border-neutral-700">
+                    <CheckCircle2 className="w-4 h-4 text-white shrink-0" style={{ width: '16px', height: '16px' }} />
+                    <span>{liveSuccessMsg}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isUpdatingLive}
+                  className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer"
+                >
+                  {isUpdatingLive ? 'Updating...' : 'Save Live Settings'}
+                </button>
+
+              </form>
             )}
 
           </div>
