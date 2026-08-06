@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+let cachedUrl: string | null = null;
+let cachedKey: string | null = null;
 let supabaseClient: SupabaseClient | null = null;
 
 const DEFAULT_SUPABASE_URL = 'https://pnpmpwkdlbbmsxqwwnjc.supabase.co';
@@ -13,10 +15,13 @@ export function getSupabaseServerClient(): SupabaseClient | null {
     return null;
   }
 
-  if (!supabaseClient) {
+  if (!supabaseClient || cachedUrl !== url || cachedKey !== key) {
+    cachedUrl = url;
+    cachedKey = key;
     supabaseClient = createClient(url, key);
   }
 
   return supabaseClient;
 }
+
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Radio, Lock, CheckCircle2, AlertCircle, Plus, RefreshCw, Film, Settings } from 'lucide-react';
+import { X, Radio, Lock, CheckCircle2, AlertCircle, Plus, Settings, Link2, Image, Check } from 'lucide-react';
+import { getSupabaseClient } from '../lib/supabaseClient';
 
 interface MistressAdminModalProps {
   isOpen: boolean;
@@ -27,8 +28,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Active Tab: 'live' | 'add_video' | 'manage_videos'
-  const [activeTab, setActiveTab] = useState<'live' | 'add_video' | 'manage_videos'>('live');
+  // Active Tab: strictly 'live' | 'upload_video'
+  const [activeTab, setActiveTab] = useState<'live' | 'upload_video'>('live');
 
   // Live Stream Control State
   const [isLive, setIsLive] = useState(currentLiveState.isLive);
@@ -42,10 +43,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   // New Video Form State
   const [videoTitle, setVideoTitle] = useState('');
   const [videoPrice, setVideoPrice] = useState('25.00');
-  const [videoUrl, setVideoUrl] = useState('https://i.imgur.com/m0CSW44.mp4');
-  const [thumbnailUrl, setThumbnailUrl] = useState('https://i.imgur.com/g5fQwuf.jpg');
+  const [driveLink, setDriveLink] = useState('');
+  
+  // Custom Thumbnail Optional Checkbox
+  const [useCustomThumbnail, setUseCustomThumbnail] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  
   const [category, setCategory] = useState('Femdom & Control');
-  const [duration, setDuration] = useState('12:45');
   const [videoDescription, setVideoDescription] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(['exclusive', 'goddesslayla', 'vip']);
@@ -54,10 +58,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [postSuccessMsg, setPostSuccessMsg] = useState<string | null>(null);
   const [postErrorMsg, setPostErrorMsg] = useState<string | null>(null);
 
-  // Manage Videos List State
-  const [customVideos, setCustomVideos] = useState<any[]>([]);
-  const [isLoadingVideos, setIsLoadingLoadingVideos] = useState(false);
-
   useEffect(() => {
     setIsLive(currentLiveState.isLive);
     setLiveTitle(currentLiveState.title);
@@ -65,41 +65,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setLivePrice(currentLiveState.price);
     setLiveStreamUrl(currentLiveState.streamUrl || 'https://i.imgur.com/m0CSW44.mp4');
   }, [currentLiveState]);
-
-  // Fetch custom uploaded videos
-  const fetchCustomVideos = async () => {
-    setIsLoadingLoadingVideos(true);
-    let items: any[] = [];
-
-    try {
-      const res = await fetch('/api/custom-media');
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (Array.isArray(data)) {
-          items = data;
-        }
-      }
-    } catch (err) {}
-
-    // Combine with local storage
-    try {
-      const localVideos = JSON.parse(localStorage.getItem('goddess_custom_videos') || '[]');
-      const map = new Map();
-      for (const item of [...items, ...localVideos]) {
-        if (item.id && !map.has(item.id)) map.set(item.id, item);
-      }
-      items = Array.from(map.values());
-    } catch (lsErr) {}
-
-    setCustomVideos(items);
-    setIsLoadingLoadingVideos(false);
-  };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchCustomVideos();
-    }
-  }, [isAuthenticated]);
 
   if (!isOpen) return null;
 
@@ -133,15 +98,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
-  // Publish New Video Session directly to the site
+  // Publish New Video Session
   const handlePublishVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!videoTitle.trim()) {
       setPostErrorMsg('Video title is required.');
       return;
     }
-    if (!videoUrl.trim()) {
-      setPostErrorMsg('Video URL / MP4 source is required.');
+    if (!driveLink.trim()) {
+      setPostErrorMsg('Google Drive public link is required.');
       return;
     }
 
@@ -149,41 +114,80 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setPostErrorMsg(null);
     setPostSuccessMsg(null);
 
-    const newVideoItem = {
-      id: `custom-vid-${Date.now()}`,
+    const finalThumbnail = useCustomThumbnail && thumbnailUrl.trim() 
+      ? thumbnailUrl.trim() 
+      : 'https://i.imgur.com/g5fQwuf.jpg';
+
+    const payload = {
       title: videoTitle.trim(),
-      titleEn: videoTitle.trim(),
+      price: videoPrice.trim() || '25.00',
+      googleDriveLink: driveLink.trim(),
+      previewUrl: driveLink.trim(),
+      videoUrl: driveLink.trim(),
+      thumbnailUrl: finalThumbnail,
       category: category.trim() || 'Exclusive Session',
-      categoryEn: category.trim() || 'Exclusive Session',
-      price: parseFloat(videoPrice) || 25.0,
-      previewUrl: videoUrl.trim(),
-      thumbnailUrl: thumbnailUrl.trim() || 'https://i.imgur.com/g5fQwuf.jpg',
-      duration: duration.trim() || 'Full length',
       description: videoDescription.trim() || 'Exclusive session published by Goddess Layla.',
-      descriptionEn: videoDescription.trim() || 'Exclusive session published by Goddess Layla.',
-      tags: tags.length > 0 ? tags : ['goddesslayla', 'exclusive']
+      tags: tags.length > 0 ? tags : ['goddesslayla', 'exclusive'],
+      createdAt: new Date().toISOString()
     };
 
+    let sbStatusText = '';
+
+    // 1. Send to Express API endpoint (which handles server-side Supabase write)
     try {
-      await fetch('/api/custom-media', {
+      const res = await fetch('/api/custom-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newVideoItem),
-      }).catch(() => {});
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.supabaseResult?.saved) {
+          sbStatusText = ' ✓ Successfully stored in Supabase database!';
+        } else if (data?.supabaseResult?.message) {
+          sbStatusText = ` (${data.supabaseResult.message})`;
+        }
+      }
     } catch (err) {}
 
-    // Save locally
+    // 2. Direct Supabase write from client
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('content_submissions').insert({
+        title: payload.title,
+        price: payload.price,
+        tags: payload.tags,
+        google_drive_link: payload.googleDriveLink,
+        name: 'Goddess Layla',
+        description: payload.description,
+        status: 'published',
+        created_at: payload.createdAt
+      });
+
+      if (!error) {
+        sbStatusText = ' ✓ Verified row stored in Supabase content_submissions table!';
+      }
+    } catch (sbErr: any) {
+      console.warn('Supabase client notice:', sbErr);
+    }
+
+    // 3. Local storage fallback
     try {
       const existingLocal = JSON.parse(localStorage.getItem('goddess_custom_videos') || '[]');
-      existingLocal.unshift(newVideoItem);
+      existingLocal.unshift({
+        id: `custom-vid-${Date.now()}`,
+        ...payload
+      });
       localStorage.setItem('goddess_custom_videos', JSON.stringify(existingLocal));
     } catch (lsErr) {}
 
-    setPostSuccessMsg('Video published successfully! It is now live on the site.');
+    setPostSuccessMsg(`Video published! ${sbStatusText}`);
     setVideoTitle('');
+    setDriveLink('');
     setVideoDescription('');
+    setThumbnailUrl('');
+    setUseCustomThumbnail(false);
 
-    fetchCustomVideos();
     onUploadMediaSuccess();
     setIsPosting(false);
   };
@@ -241,7 +245,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans text-black animate-fade-in">
-      <div className="relative max-w-3xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl my-auto border-2 border-black transition-all duration-300 transform scale-100">
+      <div className="relative max-w-2xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl my-auto border-2 border-black transition-all duration-300 transform scale-100">
         
         {/* Modal Header Bar - Pure Black and White */}
         <div className="px-6 py-4 bg-black text-white flex items-center justify-between border-b border-gray-800">
@@ -294,58 +298,45 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-xl transition-all hover:scale-102 active:scale-95 cursor-pointer border border-black"
+                className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-xl transition-all hover:scale-[1.02] active:scale-95 cursor-pointer border border-black"
               >
                 Unlock Management Panel
               </button>
             </form>
           </div>
         ) : (
-          /* Main Interactive Dashboard with Smooth Tab Animations */
+          /* Main Interactive Dashboard: Strictly GO LIVE and UPLOAD VIDEO */
           <div className="p-5 sm:p-7 space-y-6 max-h-[85vh] overflow-y-auto">
             
-            {/* Header Navigation Tabs - Black and White */}
-            <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-300">
+            {/* Header Navigation Tabs - Exactly 2 Options */}
+            <div className="grid grid-cols-2 gap-3 bg-gray-100 p-1.5 rounded-2xl border border-gray-300">
               <button
                 onClick={() => setActiveTab('live')}
-                className={`py-3 rounded-xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
-                  activeTab === 'live' ? 'bg-black text-white shadow-md scale-102' : 'text-gray-700 hover:text-black hover:bg-gray-200/60'
+                className={`py-3.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer uppercase ${
+                  activeTab === 'live' ? 'bg-black text-white shadow-lg scale-[1.02]' : 'text-gray-700 hover:text-black hover:bg-gray-200/70'
                 }`}
               >
-                <Radio className={`w-4 h-4 ${activeTab === 'live' ? 'animate-pulse' : ''}`} />
-                <span>Live Stream</span>
+                <Radio className={`w-4 h-4 ${activeTab === 'live' ? 'animate-pulse text-white' : ''}`} />
+                <span>Go Live</span>
               </button>
 
               <button
-                onClick={() => setActiveTab('add_video')}
-                className={`py-3 rounded-xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
-                  activeTab === 'add_video' ? 'bg-black text-white shadow-md scale-102' : 'text-gray-700 hover:text-black hover:bg-gray-200/60'
+                onClick={() => setActiveTab('upload_video')}
+                className={`py-3.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer uppercase ${
+                  activeTab === 'upload_video' ? 'bg-black text-white shadow-lg scale-[1.02]' : 'text-gray-700 hover:text-black hover:bg-gray-200/70'
                 }`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Video</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveTab('manage_videos');
-                  fetchCustomVideos();
-                }}
-                className={`py-3 rounded-xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
-                  activeTab === 'manage_videos' ? 'bg-black text-white shadow-md scale-102' : 'text-gray-700 hover:text-black hover:bg-gray-200/60'
-                }`}
-              >
-                <Film className="w-4 h-4" />
-                <span>Videos ({customVideos.length})</span>
+                <span>Upload Video</span>
               </button>
             </div>
 
-            {/* TAB 1: LIVE STREAM CONTROL */}
+            {/* OPTION 1: GO LIVE */}
             {activeTab === 'live' && (
               <form onSubmit={handleSaveLiveStatus} className="space-y-5 text-left animate-fade-in">
                 
                 {/* Live Stream Status Toggle Box */}
-                <div className="p-5 rounded-2xl bg-gray-50 border-2 border-black flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:border-black">
+                <div className="p-5 rounded-2xl bg-gray-50 border-2 border-black flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:shadow-md">
                   <div className="space-y-1 text-center sm:text-left">
                     <span className="text-xs font-black uppercase tracking-wider text-black block">
                       Live Broadcast Status
@@ -360,7 +351,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsLive(!isLive)}
-                    className={`px-5 py-2.5 rounded-full font-black text-xs flex items-center gap-2 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 ${
+                    className={`px-6 py-3 rounded-full font-black text-xs flex items-center gap-2 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 ${
                       isLive
                         ? 'bg-black text-white border-black shadow-md'
                         : 'bg-white text-black border-black'
@@ -403,10 +394,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                     <div>
                       <label className="text-xs font-black text-black block uppercase mb-1">
-                        Stream Video Source (MP4 / Imgur URL)
+                        Stream Video Source URL
                       </label>
                       <input
-                        type="url"
+                        type="text"
                         value={liveStreamUrl}
                         onChange={(e) => setLiveStreamUrl(e.target.value)}
                         placeholder="https://i.imgur.com/m0CSW44.mp4"
@@ -430,7 +421,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </div>
 
                 {liveSuccessMsg && (
-                  <div className="p-4 rounded-xl bg-black text-white text-xs font-bold flex items-center gap-2 animate-fade-in">
+                  <div className="p-4 rounded-xl bg-black text-white text-xs font-bold flex items-center gap-2 animate-fade-in shadow-md">
                     <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
                     <span>{liveSuccessMsg}</span>
                   </div>
@@ -439,7 +430,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 <button
                   type="submit"
                   disabled={isUpdatingLive}
-                  className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all hover:scale-102 active:scale-95 cursor-pointer border border-black"
+                  className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all hover:scale-[1.01] active:scale-95 cursor-pointer border border-black"
                 >
                   {isUpdatingLive ? 'Updating Status...' : 'Apply Live Status Changes'}
                 </button>
@@ -447,12 +438,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
               </form>
             )}
 
-            {/* TAB 2: ADD NEW VIDEO SESSION DIRECTLY TO SITE */}
-            {activeTab === 'add_video' && (
+            {/* OPTION 2: UPLOAD VIDEO */}
+            {activeTab === 'upload_video' && (
               <div className="space-y-6 text-left animate-fade-in">
                 
                 {postSuccessMsg && (
-                  <div className="p-4 rounded-2xl bg-black text-white border border-black space-y-1 shadow-lg animate-fade-in">
+                  <div className="p-4 rounded-2xl bg-black text-white border border-black space-y-1 shadow-xl animate-fade-in">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
                       <h4 className="font-black text-sm">
@@ -513,35 +504,57 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Video Source URL */}
-                    <div>
-                      <label className="text-xs font-black text-black block uppercase mb-1">
-                        Video Source (MP4 / Direct Link) *
-                      </label>
-                      <input
-                        type="url"
-                        required
-                        value={videoUrl}
-                        onChange={(e) => setVideoUrl(e.target.value)}
-                        placeholder="https://i.imgur.com/m0CSW44.mp4"
-                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-300 text-xs font-mono text-black focus:bg-white focus:border-black focus:outline-hidden transition-all"
-                      />
-                    </div>
+                  {/* Google Drive Public Link */}
+                  <div>
+                    <label className="text-xs font-black text-black block uppercase mb-1 flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-black" />
+                      <span>Video Source (Google Drive Public Link) *</span>
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      value={driveLink}
+                      onChange={(e) => setDriveLink(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/1ABC123.../view?usp=sharing"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-300 text-xs font-mono text-black focus:bg-white focus:border-black focus:outline-hidden transition-all"
+                    />
+                    <p className="text-[11px] text-gray-500 font-medium mt-1">
+                      Paste a public Google Drive link (anyone with link can view).
+                    </p>
+                  </div>
 
-                    {/* Thumbnail URL */}
-                    <div>
-                      <label className="text-xs font-black text-black block uppercase mb-1">
-                        Poster Thumbnail Image URL
-                      </label>
+                  {/* Custom Thumbnail Checkbox Toggle */}
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-300 space-y-3 transition-all">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <div className={`w-5 h-5 rounded-md border-2 border-black flex items-center justify-center transition-all ${useCustomThumbnail ? 'bg-black text-white' : 'bg-white text-transparent'}`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
                       <input
-                        type="url"
-                        value={thumbnailUrl}
-                        onChange={(e) => setThumbnailUrl(e.target.value)}
-                        placeholder="https://i.imgur.com/g5fQwuf.jpg"
-                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-300 text-xs font-mono text-black focus:bg-white focus:border-black focus:outline-hidden transition-all"
+                        type="checkbox"
+                        checked={useCustomThumbnail}
+                        onChange={(e) => setUseCustomThumbnail(e.target.checked)}
+                        className="sr-only"
                       />
-                    </div>
+                      <span className="text-xs font-black text-black uppercase tracking-wider">
+                        Do you want to put custom thumbnail? (Optional)
+                      </span>
+                    </label>
+
+                    {useCustomThumbnail && (
+                      <div className="pt-2 animate-fade-in">
+                        <label className="text-xs font-black text-black block uppercase mb-1 flex items-center gap-1.5">
+                          <Image className="w-3.5 h-3.5 text-black" />
+                          <span>Custom Thumbnail Image URL</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={thumbnailUrl}
+                          onChange={(e) => setThumbnailUrl(e.target.value)}
+                          placeholder="https://images.unsplash.com/photo-... or custom image URL"
+                          className="w-full px-4 py-3 rounded-xl bg-white border border-gray-400 text-xs font-mono text-black focus:border-black focus:outline-hidden transition-all"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Tags Manager */}
@@ -610,10 +623,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   <button
                     type="submit"
                     disabled={isPosting}
-                    className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-xl transition-all hover:scale-102 active:scale-95 cursor-pointer border border-black flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-wider shadow-xl transition-all hover:scale-[1.01] active:scale-95 cursor-pointer border border-black flex items-center justify-center gap-2"
                   >
                     {isPosting ? (
-                      <span>Publishing...</span>
+                      <span>Publishing Video...</span>
                     ) : (
                       <>
                         <Plus className="w-4 h-4 text-white" />
@@ -623,67 +636,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   </button>
 
                 </form>
-
-              </div>
-            )}
-
-            {/* TAB 3: MANAGE EXISTING VIDEOS */}
-            {activeTab === 'manage_videos' && (
-              <div className="space-y-4 text-left animate-fade-in">
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-black text-black uppercase tracking-wider">
-                      Active Videos ({customVideos.length})
-                    </h3>
-                    <p className="text-xs text-gray-600 font-semibold">
-                      Published video sessions active on Goddess Layla's site.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={fetchCustomVideos}
-                    className="px-3.5 py-2 rounded-xl bg-black hover:bg-gray-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingVideos ? 'animate-spin' : ''}`} />
-                    <span>Refresh</span>
-                  </button>
-                </div>
-
-                {customVideos.length === 0 ? (
-                  <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-300 text-xs text-gray-600 font-semibold">
-                    No custom videos published yet. Click "Add Video" above to publish your first session.
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {customVideos.map((video) => (
-                      <div 
-                        key={video.id} 
-                        className="p-4 rounded-2xl bg-gray-50 border border-gray-300 hover:border-black transition-all flex items-center justify-between gap-4 text-xs group"
-                      >
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-black text-sm truncate">{video.title}</span>
-                            <span className="px-2.5 py-0.5 rounded-full bg-black text-white font-black text-xs shrink-0">
-                              {video.price} €
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-gray-600 text-[11px] font-semibold">
-                            <span>Category: {video.category}</span>
-                            <span>•</span>
-                            <span className="truncate">Source: {video.previewUrl}</span>
-                          </div>
-                        </div>
-
-                        <div className="px-3 py-1.5 rounded-full bg-black text-white text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                          <span>ACTIVE ON SITE</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
               </div>
             )}

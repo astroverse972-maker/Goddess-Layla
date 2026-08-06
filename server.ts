@@ -166,45 +166,116 @@ app.post("/api/upload-catbox", async (req, res) => {
 // Custom Uploaded Media Collection State
 const customUploadedMedia: any[] = [];
 
-app.get("/api/custom-media", (_req, res) => {
-  res.json(customUploadedMedia);
+app.get("/api/custom-media", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  let media = [...customUploadedMedia];
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("content_submissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const mappedFromDb = data.map((row) => ({
+          id: row.id || `db-${Date.now()}`,
+          title: row.title || "Untitled Session",
+          titleEn: row.title || "Untitled Session",
+          category: "Goddess Exclusive",
+          categoryEn: "Goddess Exclusive",
+          price: parseFloat(row.price) || 20.00,
+          previewUrl: row.google_drive_link || "https://i.imgur.com/m0CSW44.mp4",
+          videoUrl: row.google_drive_link || "https://i.imgur.com/m0CSW44.mp4",
+          googleDriveLink: row.google_drive_link || "",
+          thumbnailUrl: row.thumbnail_url || "https://i.imgur.com/g5fQwuf.jpg",
+          duration: "Full length",
+          description: row.description || "Exclusive session published by Goddess Layla.",
+          descriptionEn: row.description || "Exclusive session published by Goddess Layla.",
+          tags: Array.isArray(row.tags) ? row.tags : ["goddesslayla", "exclusive"],
+          createdAt: row.created_at
+        }));
+
+        const map = new Map();
+        for (const item of [...mappedFromDb, ...customUploadedMedia]) {
+          const key = item.googleDriveLink || item.previewUrl || item.id;
+          if (!map.has(key)) {
+            map.set(key, item);
+          }
+        }
+        media = Array.from(map.values());
+      }
+    } catch (sbErr) {
+      console.warn("Supabase custom-media query warning:", sbErr);
+    }
+  }
+
+  res.json(media);
 });
 
-app.post("/api/custom-media", (req, res) => {
+app.post("/api/custom-media", async (req, res) => {
   try {
-    const { passcode, title, category, price, previewUrl, videoUrl, thumbnailUrl, duration, description } = req.body;
+    const { passcode, title, category, price, previewUrl, videoUrl, googleDriveLink, thumbnailUrl, duration, description, tags } = req.body;
 
-    if (passcode !== "LAYLA2026" && passcode !== "GODDESS-VIP" && passcode !== "INAYA2026" && passcode !== "REINE-VIP") {
-      return res.status(401).json({ error: "Invalid Passcode." });
-    }
-
-    const finalVideoUrl = videoUrl || previewUrl;
+    const finalVideoUrl = googleDriveLink || videoUrl || previewUrl;
     if (!title || !finalVideoUrl) {
-      return res.status(400).json({ error: "Title and video file are required." });
+      return res.status(400).json({ error: "Title and video source URL are required." });
     }
 
     const newItem = {
       id: `custom-vid-${Date.now()}`,
-      title: title,
-      titleEn: title,
+      title: title.trim(),
+      titleEn: title.trim(),
       category: category || "Goddess Exclusive",
       categoryEn: category || "Goddess Exclusive",
       price: parseFloat(price) || 20.00,
-      previewUrl: previewUrl || finalVideoUrl,
-      videoUrl: finalVideoUrl,
-      thumbnailUrl: thumbnailUrl || finalVideoUrl,
+      previewUrl: finalVideoUrl.trim(),
+      videoUrl: finalVideoUrl.trim(),
+      googleDriveLink: finalVideoUrl.trim(),
+      thumbnailUrl: thumbnailUrl || "https://i.imgur.com/g5fQwuf.jpg",
       duration: duration || "Full length",
       description: description || "Exclusive video published by Goddess Layla.",
       descriptionEn: description || "Exclusive video published by Goddess Layla.",
-      tags: ["new", "goddesslayla", "exclusive"]
+      tags: Array.isArray(tags) ? tags : ["new", "goddesslayla", "exclusive"],
+      createdAt: new Date().toISOString()
     };
 
     customUploadedMedia.unshift(newItem); // put at top
 
+    // Save directly to Supabase content_submissions table
+    let supabaseResult = { saved: false, message: "Supabase client not configured" };
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from("content_submissions").insert({
+          title: newItem.title,
+          price: String(newItem.price),
+          tags: newItem.tags,
+          google_drive_link: newItem.videoUrl,
+          name: "Goddess Layla",
+          description: newItem.description,
+          status: "published",
+          created_at: newItem.createdAt
+        }).select('*');
+
+        if (error) {
+          console.error("Supabase content_submissions insert error:", error);
+          supabaseResult = { saved: false, message: error.message };
+        } else {
+          console.log("Successfully inserted into Supabase content_submissions:", data);
+          supabaseResult = { saved: true, message: "Saved to Supabase content_submissions table" };
+        }
+      } catch (sbErr: any) {
+        console.warn("Supabase content_submissions insert notice:", sbErr);
+        supabaseResult = { saved: false, message: sbErr?.message || "Insert failed" };
+      }
+    }
+
     return res.json({
       success: true,
       item: newItem,
-      items: customUploadedMedia
+      items: customUploadedMedia,
+      supabaseResult
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
