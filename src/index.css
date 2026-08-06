@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
 @layer utilities {
   /* Apple San Francisco Typography & Smooth Anti-aliasing */
   body {
