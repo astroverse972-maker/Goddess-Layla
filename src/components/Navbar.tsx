@@ -8,7 +8,7 @@ interface NavbarProps {
   onOpenPayment: () => void;
   onOpenContact: () => void;
   onOpenShop: () => void;
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
   lang?: 'fr' | 'en';
   onToggleLang?: () => void;
 }
@@ -19,7 +19,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPayment,
   onOpenContact,
   onOpenShop,
-  onOpenAdmin,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -120,7 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="px-3 py-1.5 rounded-full bg-black text-white hover:bg-gray-800 text-xs font-bold transition-all shadow-xs flex items-center gap-1"
             title="X (Twitter) @Geldherrinlay9"
           >
-            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 fill-current shrink-0" width="12" height="12" style={{ width: '12px', height: '12px', maxWidth: '12px', maxHeight: '12px', display: 'inline-block' }} viewBox="0 0 24 24">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
             <span>X</span>

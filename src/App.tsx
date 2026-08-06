@@ -70,43 +70,20 @@ export function App() {
     fetchServerState();
     const interval = setInterval(fetchServerState, 5000); // sync every 5 seconds
 
-    // Check if URL indicates admin portal request
+    // Check if URL indicates admin portal request strictly via #admin
     const checkAdminRoute = () => {
-      const path = window.location.pathname.toLowerCase();
-      const search = window.location.search.toLowerCase();
       const hash = window.location.hash.toLowerCase();
-      if (
-        path.includes('/admin') ||
-        path.includes('/layla') ||
-        path.includes('/goddess') ||
-        path.includes('/espace-reine') ||
-        path.includes('/reine') ||
-        search.includes('admin') ||
-        hash.includes('admin') ||
-        hash.includes('espace-reine')
-      ) {
+      if (hash === '#admin') {
         setIsMistressAdminOpen(true);
       }
     };
 
     checkAdminRoute();
-    window.addEventListener('popstate', checkAdminRoute);
     window.addEventListener('hashchange', checkAdminRoute);
-
-    // Discrete Keyboard Shortcut: Ctrl+Shift+A or Cmd+Shift+A
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        setIsMistressAdminOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('popstate', checkAdminRoute);
       window.removeEventListener('hashchange', checkAdminRoute);
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -131,7 +108,6 @@ export function App() {
         onOpenPayment={() => setIsPaymentModalOpen(true)}
         onOpenContact={() => setIsContactModalOpen(true)}
         onOpenShop={scrollToCollection}
-        onOpenAdmin={() => setIsMistressAdminOpen(true)}
       />
 
       {/* Main Page Layout */}
@@ -161,7 +137,7 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <Footer lang={lang} onOpenAdmin={() => setIsMistressAdminOpen(true)} />
+      <Footer lang={lang} />
 
       {/* Modals */}
       <MediaModal

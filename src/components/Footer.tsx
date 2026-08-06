@@ -80,16 +80,8 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
           </p>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
-          <div 
-            onClick={(e) => {
-              if (e.detail === 3 && onOpenAdmin) {
-                onOpenAdmin();
-              }
-            }}
-            className="select-none cursor-default"
-            title="© Goddess Layla"
-          >
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
+          <div className="select-none cursor-default">
             © {new Date().getFullYear()} Goddess Layla👸🏻. All rights reserved. VIP Space 18+.
           </div>
         </div>
