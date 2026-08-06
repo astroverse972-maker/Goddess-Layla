@@ -37,7 +37,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
               About Me
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-black tracking-tight leading-tight">
-              Goddess Lay👸🏻
+              Goddess Layla👸🏻
             </h2>
             <div className="flex items-center gap-2 text-sm sm:text-base text-gray-800 font-semibold">
               <Send className="w-4 h-4 text-sky-600" />

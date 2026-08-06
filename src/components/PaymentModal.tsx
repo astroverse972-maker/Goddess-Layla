@@ -40,7 +40,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase">
-            Goddess Lay👸🏻 - TipFunder Payment Portal
+            Goddess Layla👸🏻 - TipFunder Payment Portal
           </span>
           <button
             onClick={onClose}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Menu, X as CloseIcon, CreditCard, Mail, Film, Gift, Send } from 'lucide-react';
+import { Search, Menu, X as CloseIcon, CreditCard, Mail, Film, Gift, Send, Crown } from 'lucide-react';
 import { SOCIAL_LINKS } from '../data/collectionData';
 
 interface NavbarProps {
@@ -19,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPayment,
   onOpenContact,
   onOpenShop,
+  onOpenAdmin,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -32,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="cursor-pointer group flex items-center gap-2 select-none"
         >
           <span className="font-serif text-xl sm:text-2xl font-extrabold text-black tracking-tight transition-colors">
-            Goddess Lay👸🏻
+            Goddess Layla👸🏻
           </span>
         </div>
 

@@ -53,13 +53,13 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
 
           {/* Main Heading */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-none">
-            {isLive ? 'Goddess Layla is Live' : 'Goddess Lay👸🏻'}
+            {isLive ? 'Goddess Layla is Live' : 'Goddess Layla👸🏻'}
           </h1>
 
           <p className="text-gray-200 text-xs sm:text-sm font-medium max-w-md">
             {isLive
               ? (liveState?.description || 'Exclusive access to live stream VIP')
-              : 'Goddess Lay👸🏻 • Telegram: laylathebest'}
+              : 'Goddess Layla👸🏻 • Telegram: laylathebest'}
           </p>
 
           {/* Action Button */}
@@ -90,14 +90,14 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
       {/* 2. SECOND SECTION: Profile Card */}
       <div className="w-full bg-white rounded-3xl border border-gray-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 transition-all">
         
-        {/* Left Side: Image + Goddess Lay Profile */}
+        {/* Left Side: Image + Goddess Layla Profile */}
         <div className="flex items-center gap-4 sm:gap-5 text-center sm:text-left">
           
           {/* Avatar Image */}
           <div className="relative shrink-0">
             <img
               src={AVATAR_IMG}
-              alt="Goddess Lay👸🏻"
+              alt="Goddess Layla👸🏻"
               referrerPolicy="no-referrer"
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-gray-300 shadow-xs"
             />
@@ -107,7 +107,7 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
           <div className="space-y-1">
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
               <h2 className="text-xl sm:text-2xl font-bold text-black tracking-tight">
-                Goddess Lay👸🏻
+                Goddess Layla👸🏻
               </h2>
               <CheckCircle2 className="w-4 h-4 text-black fill-gray-100" />
             </div>

@@ -52,7 +52,7 @@ export const LiveModal: React.FC<LiveModalProps> = ({ isOpen, onClose, liveState
               {isLive ? 'LIVE' : 'OFFLINE'}
             </span>
             <span className="text-sm font-extrabold text-white">
-              Goddess Lay👸🏻 — VIP Live Stream
+              Goddess Layla👸🏻 — VIP Live Stream
             </span>
           </div>
 

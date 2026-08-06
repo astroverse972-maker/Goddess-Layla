@@ -83,10 +83,20 @@ export function App() {
     window.addEventListener('popstate', checkAdminRoute);
     window.addEventListener('hashchange', checkAdminRoute);
 
+    // Discrete Keyboard Shortcut: Ctrl+Shift+A or Cmd+Shift+A
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsMistressAdminOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('popstate', checkAdminRoute);
       window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
