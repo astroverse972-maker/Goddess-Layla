@@ -225,9 +225,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         })
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        const text = await res.text();
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { error: 'Invalid response from server' };
+      }
 
-      if (res.ok && data.success) {
+      if (res.ok && data && data.success) {
         localStorage.setItem('goddess_custom_passcode', resetPasscodeValue.trim());
         setCurrentBackendPasscode(resetPasscodeValue.trim());
         setForgotSuccessMsg('Passcode verified & updated in Supabase database successfully!');
@@ -320,9 +326,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         body: JSON.stringify(payload)
       });
 
-      const resData = await res.json();
+      let resData: any = null;
+      try {
+        const text = await res.text();
+        resData = JSON.parse(text);
+      } catch (e) {
+        resData = { success: false };
+      }
 
-      if (res.ok && resData.success) {
+      if (res.ok && resData && resData.success) {
         setPostSuccessMsg('Video published and saved directly to Supabase database! Content is live.');
       } else {
         setPostSuccessMsg('Thank you, Video will appear in page after verification');
@@ -463,9 +475,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         })
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        const text = await res.text();
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { error: 'Invalid response from server' };
+      }
 
-      if (res.ok && data.success) {
+      if (res.ok && data && data.success) {
         localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
         setCurrentBackendPasscode(newPasscode.trim());
         setSecuritySuccessMsg('Access passcode verified and saved directly to Supabase database!');
