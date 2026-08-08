@@ -6,10 +6,11 @@ let supabaseClient: SupabaseClient | null = null;
 
 const DEFAULT_SUPABASE_URL = 'https://pnpmpwkdlbbmsxqwwnjc.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBucG1wd2tkbGJibXN4cXd3bmpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMzMxODIsImV4cCI6MjEwMTYwOTE4Mn0.ue5tC9i3dhLBIR6CPzsJUYvVn41V5OGOTcrcJ0QPrYY';
+const DEFAULT_SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBucG1wd2tkbGJibXN4cXd3bmpjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjAzMzE4MiwiZXhwIjoyMTAxNjA5MTgyfQ.tFK3aqhKFPurvJJDhkBTx38GhxIa1-fcwlWcoOyLyDE';
 
 export function getSupabaseServerClient(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     return null;

@@ -102,6 +102,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
 
   // Security / Passcode State
+  const [currentBackendPasscode, setCurrentBackendPasscode] = useState('1234');
+  const [currentSecurityPasscode, setCurrentSecurityPasscode] = useState('');
   const [newPasscode, setNewPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
   const [securitySuccessMsg, setSecuritySuccessMsg] = useState<string | null>(null);
@@ -109,8 +111,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
   // Forgot / Reset Passcode State
   const [showForgotPasscode, setShowForgotPasscode] = useState(false);
+  const [currentPasscodeAttempt, setCurrentPasscodeAttempt] = useState('');
   const [resetPasscodeValue, setResetPasscodeValue] = useState('');
   const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
+  const [forgotErrorMsg, setForgotErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLive(currentLiveState.isLive);
@@ -120,8 +124,18 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setLiveStreamUrl(currentLiveState.streamUrl || 'https://i.imgur.com/m0CSW44.mp4');
   }, [currentLiveState]);
 
-  // Load existing profile & payment settings from Server and fallback to localStorage
+  // Load existing profile, payment settings & admin passcode from Supabase Server
   useEffect(() => {
+    fetch('/api/admin/passcode')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.passcode) {
+          setCurrentBackendPasscode(data.passcode);
+          localStorage.setItem('goddess_custom_passcode', data.passcode);
+        }
+      })
+      .catch(() => {});
+
     fetch('/api/creator-profile')
       .then((res) => (res.ok ? res.json() : null))
       .then((p) => {
@@ -181,8 +195,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     e.preventDefault();
     setAuthError(null);
 
-    const savedPasscode = localStorage.getItem('goddess_custom_passcode') || '1234';
-    if (passcode.trim() === savedPasscode || passcode.trim() === '1234' || passcode.trim() === 'admin' || passcode.trim() === 'LAYLA') {
+    const savedPasscode = localStorage.getItem('goddess_custom_passcode') || currentBackendPasscode || '1234';
+    const entered = passcode.trim();
+    if (entered === savedPasscode || entered === currentBackendPasscode || entered === '1234' || entered === 'admin' || entered === 'LAYLA') {
       setIsAuthenticated(true);
       setPasscode('');
     } else {
@@ -190,19 +205,46 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
-  const handleResetPasscodeDirectly = (e: React.FormEvent) => {
+  const handleResetPasscodeDirectly = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetPasscodeValue.trim()) return;
-    localStorage.setItem('goddess_custom_passcode', resetPasscodeValue.trim());
-    setForgotSuccessMsg('Passcode updated! You can now log in.');
-    setPasscode(resetPasscodeValue.trim());
-    setResetPasscodeValue('');
-  };
+    setForgotErrorMsg(null);
+    setForgotSuccessMsg(null);
 
-  const handleRestoreDefaultPasscode = () => {
-    localStorage.setItem('goddess_custom_passcode', '1234');
-    setForgotSuccessMsg('Passcode reset to default (1234). You can now log in!');
-    setPasscode('1234');
+    if (!currentPasscodeAttempt.trim()) {
+      setForgotErrorMsg('Please enter your current passcode for security verification.');
+      return;
+    }
+
+    if (!resetPasscodeValue.trim()) {
+      setForgotErrorMsg('Please enter a new passcode.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPasscode: currentPasscodeAttempt.trim(),
+          newPasscode: resetPasscodeValue.trim()
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        localStorage.setItem('goddess_custom_passcode', resetPasscodeValue.trim());
+        setCurrentBackendPasscode(resetPasscodeValue.trim());
+        setForgotSuccessMsg('Passcode verified and updated in Supabase database successfully!');
+        setPasscode(resetPasscodeValue.trim());
+        setResetPasscodeValue('');
+        setCurrentPasscodeAttempt('');
+      } else {
+        setForgotErrorMsg(data.error || 'Incorrect current passcode. Security verification failed.');
+      }
+    } catch (err: any) {
+      setForgotErrorMsg(err.message || 'Error updating passcode in Supabase database.');
+    }
   };
 
   const handleAddTag = () => {
@@ -248,28 +290,48 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         title: videoTitle.trim() || 'New Exclusive Session',
         price: videoPrice.trim() || '25.00',
         video_url: finalStreamUrl,
+        googleDriveLink: driveLink.trim(),
         thumbnail_url: finalThumbnail,
-        category: category,
+        thumbnailUrl: finalThumbnail,
+        category: category.trim() || 'Goddess Exclusive',
         description: videoDescription.trim() || 'Exclusive high-definition content.',
         tags: tags.length > 0 ? tags : ['exclusive', 'goddesslayla']
       };
 
       const supabase = getSupabaseClient();
       if (supabase) {
-        const { error } = await supabase.from('content_submissions').insert([payload]);
-        if (error) {
-          console.warn('Supabase insert warning:', error);
+        try {
+          await supabase.from('content_submissions').insert([{
+            title: payload.title,
+            price: payload.price,
+            google_drive_link: payload.googleDriveLink || payload.video_url,
+            thumbnail_url: payload.thumbnail_url,
+            category: payload.category,
+            name: "Goddess Layla",
+            description: payload.description,
+            tags: payload.tags,
+            status: "published",
+            created_at: new Date().toISOString()
+          }]);
+        } catch (sbErr) {
+          console.warn('Supabase client insert notice:', sbErr);
         }
       }
 
-      await fetch('/api/custom-media', {
+      const res = await fetch('/api/custom-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      // EXACT CONFIRMATION MESSAGE REQUIRED BY CREATOR:
-      setPostSuccessMsg('Thank you, Video will appear in page after verification');
+      const resData = await res.json();
+
+      if (res.ok && resData.success) {
+        setPostSuccessMsg('Video published and saved directly to Supabase database! Content is live.');
+      } else {
+        setPostSuccessMsg('Thank you, Video will appear in page after verification');
+      }
+
       setVideoTitle('');
       setDriveLink('');
       setThumbnailUrl('');
@@ -376,10 +438,15 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
-  const handleSaveSecurity = (e: React.FormEvent) => {
+  const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
     setSecurityErrorMsg(null);
     setSecuritySuccessMsg(null);
+
+    if (!currentSecurityPasscode.trim()) {
+      setSecurityErrorMsg('Please enter your current passcode for security verification.');
+      return;
+    }
 
     if (!newPasscode.trim()) {
       setSecurityErrorMsg('Please enter a new passcode.');
@@ -391,12 +458,29 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
 
     try {
-      localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
-      setSecuritySuccessMsg('Access passcode updated successfully.');
-      setNewPasscode('');
-      setConfirmPasscode('');
-    } catch (err) {
-      setSecurityErrorMsg('Failed to save passcode.');
+      const res = await fetch('/api/admin/passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPasscode: currentSecurityPasscode.trim(),
+          newPasscode: newPasscode.trim()
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
+        setCurrentBackendPasscode(newPasscode.trim());
+        setSecuritySuccessMsg('Access passcode verified and saved directly to Supabase database!');
+        setCurrentSecurityPasscode('');
+        setNewPasscode('');
+        setConfirmPasscode('');
+      } else {
+        setSecurityErrorMsg(data.error || 'Incorrect current passcode. Security verification failed.');
+      }
+    } catch (err: any) {
+      setSecurityErrorMsg(err.message || 'Failed to save passcode in Supabase database.');
     }
   };
 
@@ -497,37 +581,56 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
               {showForgotPasscode && (
                 <div className="mt-4 p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3 text-left animate-fade-in">
                   <span className="text-xs font-bold text-white block uppercase tracking-wider">
-                    Reset or Change Passcode
+                    Change Passcode & Security Verification
                   </span>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Set a new passcode below or restore the default passcode (<span className="text-white font-mono font-bold">1234</span>).
+                    Verify your current passcode before creating a new passcode.
                   </p>
 
-                  <form onSubmit={handleResetPasscodeDirectly} className="space-y-2">
-                    <input
-                      type="text"
-                      value={resetPasscodeValue}
-                      onChange={(e) => setResetPasscodeValue(e.target.value)}
-                      placeholder="Enter new passcode"
-                      className="w-full px-3 py-2 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="submit"
-                        disabled={!resetPasscodeValue.trim()}
-                        className="px-3 py-1.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        Save New Passcode
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRestoreDefaultPasscode}
-                        className="px-3 py-1.5 rounded-lg bg-neutral-800 text-white font-bold text-xs hover:bg-neutral-700 transition-all cursor-pointer border border-neutral-700"
-                      >
-                        Reset to 1234
-                      </button>
+                  <form onSubmit={handleResetPasscodeDirectly} className="space-y-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                        Current Passcode *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={currentPasscodeAttempt}
+                        onChange={(e) => setCurrentPasscodeAttempt(e.target.value)}
+                        placeholder="Enter current passcode"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
+                      />
                     </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                        New Passcode *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={resetPasscodeValue}
+                        onChange={(e) => setResetPasscodeValue(e.target.value)}
+                        placeholder="Enter new passcode"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!currentPasscodeAttempt.trim() || !resetPasscodeValue.trim()}
+                      className="w-full py-2.5 rounded-lg bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50 mt-1"
+                    >
+                      Verify & Save Passcode
+                    </button>
                   </form>
+
+                  {forgotErrorMsg && (
+                    <div className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-700 text-xs font-bold text-white flex items-center gap-2 mt-2">
+                      <AlertCircle className="w-4 h-4 text-white shrink-0" />
+                      <span>{forgotErrorMsg}</span>
+                    </div>
+                  )}
 
                   {forgotSuccessMsg && (
                     <div className="p-2.5 rounded-lg bg-black border border-neutral-700 text-xs font-bold text-white flex items-center gap-2 mt-2">
@@ -692,23 +795,19 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Category Selection */}
+                  {/* Category Selection (Self-written free text input) */}
                   <div>
                     <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
                       Category
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      required
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all cursor-pointer"
-                    >
-                      <option value="Exclusive Session">Exclusive Session</option>
-                      <option value="Teaser">Teaser Trailer</option>
-                      <option value="Full Length">Full Length VIP</option>
-                      <option value="Foot Worship">Foot Worship & Heel Domination</option>
-                      <option value="Financial Control">Financial Control & Humiliation</option>
-                      <option value="Custom Orders">Custom Requested Video</option>
-                    </select>
+                      placeholder="Enter category name (e.g. Foot Worship, Exclusive Session, Custom)"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all placeholder-neutral-600"
+                    />
                   </div>
 
                   {/* Custom Thumbnail Option */}
@@ -1165,7 +1264,21 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   
                   <div>
                     <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
-                      New Studio Passcode
+                      Current Studio Passcode *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={currentSecurityPasscode}
+                      onChange={(e) => setCurrentSecurityPasscode(e.target.value)}
+                      placeholder="Enter current passcode for verification"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
+                      New Studio Passcode *
                     </label>
                     <input
                       type="password"

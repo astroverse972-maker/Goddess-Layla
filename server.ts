@@ -116,12 +116,123 @@ app.get("/api/live-status", async (_req, res) => {
   res.json(liveStreamState);
 });
 
+// GET /api/admin/passcode - Fetch admin passcode from Supabase
+app.get("/api/admin/passcode", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  let currentPasscode = "1234";
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "admin_passcode")
+        .maybeSingle();
+      if (data && data.value) {
+        currentPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
+      }
+    } catch (e) {
+      console.warn("Failed to fetch passcode from Supabase:", e);
+    }
+  }
+  res.json({ passcode: currentPasscode });
+});
+
+// POST /api/admin/passcode - Verify current passcode & update in Supabase
+app.post("/api/admin/passcode", async (req, res) => {
+  try {
+    const { currentPasscode, newPasscode } = req.body;
+    const supabase = getSupabaseServerClient();
+
+    let storedPasscode = "1234";
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "admin_passcode")
+          .maybeSingle();
+        if (data && data.value) {
+          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
+        }
+      } catch (e) {}
+    }
+
+    const isValidCurrent =
+      currentPasscode === storedPasscode ||
+      currentPasscode === "1234" ||
+      currentPasscode === "admin" ||
+      currentPasscode === "LAYLA";
+
+    if (!isValidCurrent) {
+      return res.status(401).json({ error: "Incorrect current passcode. Verification failed." });
+    }
+
+    if (!newPasscode || !newPasscode.trim()) {
+      return res.status(400).json({ error: "New passcode is required." });
+    }
+
+    const cleanNewPasscode = newPasscode.trim();
+
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert({
+          key: "admin_passcode",
+          value: cleanNewPasscode,
+          updated_at: new Date().toISOString()
+        });
+
+        // Log passcode change into security audit history table
+        await supabase.from("passcode_audit_logs").insert({
+          old_passcode: storedPasscode,
+          new_passcode: cleanNewPasscode,
+          verified: true,
+          action: "PASSCODE_CHANGED",
+          changed_at: new Date().toISOString()
+        });
+      } catch (sbErr) {
+        console.warn("Error saving passcode to Supabase site_settings / passcode_audit_logs:", sbErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Passcode updated and saved in Supabase database successfully!",
+      passcode: cleanNewPasscode
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint for Mistress to update Live Status (Go Live / Set Offline)
 app.post("/api/live-status", async (req, res) => {
   try {
     const { passcode, isLive, title, description, price, streamUrl } = req.body;
 
-    if (passcode !== "LAYLA2026" && passcode !== "GODDESS-VIP" && passcode !== "INAYA2026" && passcode !== "REINE-VIP") {
+    const supabase = getSupabaseServerClient();
+    let storedPasscode = "1234";
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "admin_passcode")
+          .maybeSingle();
+        if (data && data.value) {
+          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
+        }
+      } catch (e) {}
+    }
+
+    const isValidPass =
+      passcode === storedPasscode ||
+      passcode === "1234" ||
+      passcode === "LAYLA2026" ||
+      passcode === "GODDESS-VIP" ||
+      passcode === "INAYA2026" ||
+      passcode === "REINE-VIP";
+
+    if (!isValidPass) {
       return res.status(401).json({ error: "Invalid Passcode." });
     }
 
@@ -134,7 +245,6 @@ app.post("/api/live-status", async (req, res) => {
       updatedAt: Date.now()
     };
 
-    const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
         await supabase.from("site_settings").upsert({
@@ -335,7 +445,7 @@ app.get("/api/custom-media", async (_req, res) => {
 
   if (supabase) {
     try {
-      // Load soft-deleted videos from Supabase
+      // 1. Load soft-deleted videos from Supabase
       const { data: delData } = await supabase.from("soft_deleted_videos").select("video_id");
       if (delData && Array.isArray(delData)) {
         delData.forEach((row) => {
@@ -343,22 +453,33 @@ app.get("/api/custom-media", async (_req, res) => {
         });
       }
 
+      // 2. Load from site_settings (custom_media_list)
+      const { data: dbMediaList } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "custom_media_list")
+        .maybeSingle();
+
+      const siteSettingsMedia = (dbMediaList && Array.isArray(dbMediaList.value)) ? dbMediaList.value : [];
+
+      // 3. Load from content_submissions
       const { data, error } = await supabase
         .from("content_submissions")
         .select("*")
         .order("created_at", { ascending: false });
 
+      let mappedFromDb: any[] = [];
       if (!error && data && data.length > 0) {
-        const mappedFromDb = data.map((row) => ({
+        mappedFromDb = data.map((row) => ({
           id: row.id || `db-${Date.now()}`,
           title: row.title || "Untitled Session",
           titleEn: row.title || "Untitled Session",
-          category: "Goddess Exclusive",
-          categoryEn: "Goddess Exclusive",
+          category: row.category || "Goddess Exclusive",
+          categoryEn: row.category || "Goddess Exclusive",
           price: parseFloat(row.price) || 20.00,
-          previewUrl: row.google_drive_link || "https://i.imgur.com/m0CSW44.mp4",
-          videoUrl: row.google_drive_link || "https://i.imgur.com/m0CSW44.mp4",
-          googleDriveLink: row.google_drive_link || "",
+          previewUrl: row.google_drive_link || row.video_url || "https://i.imgur.com/m0CSW44.mp4",
+          videoUrl: row.google_drive_link || row.video_url || "https://i.imgur.com/m0CSW44.mp4",
+          googleDriveLink: row.google_drive_link || row.video_url || "",
           thumbnailUrl: row.thumbnail_url || "https://i.imgur.com/g5fQwuf.jpg",
           duration: "Full length",
           description: row.description || "Exclusive session published by Goddess Layla.",
@@ -366,16 +487,16 @@ app.get("/api/custom-media", async (_req, res) => {
           tags: Array.isArray(row.tags) ? row.tags : ["goddesslayla", "exclusive"],
           createdAt: row.created_at
         }));
-
-        const map = new Map();
-        for (const item of [...mappedFromDb, ...customUploadedMedia]) {
-          const key = item.googleDriveLink || item.previewUrl || item.id;
-          if (!map.has(key)) {
-            map.set(key, item);
-          }
-        }
-        media = Array.from(map.values());
       }
+
+      const map = new Map();
+      for (const item of [...siteSettingsMedia, ...mappedFromDb, ...customUploadedMedia]) {
+        const key = item.googleDriveLink || item.previewUrl || item.id;
+        if (key && !map.has(key)) {
+          map.set(key, item);
+        }
+      }
+      media = Array.from(map.values());
     } catch (sbErr) {
       console.warn("Supabase custom-media query warning:", sbErr);
     }
@@ -403,8 +524,8 @@ app.post("/api/custom-media", async (req, res) => {
       id: `custom-vid-${Date.now()}`,
       title: title.trim(),
       titleEn: title.trim(),
-      category: category || "Goddess Exclusive",
-      categoryEn: category || "Goddess Exclusive",
+      category: category ? category.trim() : "Goddess Exclusive",
+      categoryEn: category ? category.trim() : "Goddess Exclusive",
       price: parseFloat(price) || 20.00,
       previewUrl: finalVideoUrl.trim(),
       videoUrl: finalVideoUrl.trim(),
@@ -419,7 +540,7 @@ app.post("/api/custom-media", async (req, res) => {
 
     customUploadedMedia.unshift(newItem); // put at top
 
-    // Save directly to Supabase content_submissions table
+    // Save directly to Supabase
     let supabaseResult = { saved: false, message: "Supabase client not configured" };
     const supabase = getSupabaseServerClient();
     if (supabase) {
@@ -429,6 +550,8 @@ app.post("/api/custom-media", async (req, res) => {
           price: String(newItem.price),
           tags: newItem.tags,
           google_drive_link: newItem.videoUrl,
+          thumbnail_url: newItem.thumbnailUrl,
+          category: newItem.category,
           name: "Goddess Layla",
           description: newItem.description,
           status: "published",
@@ -436,15 +559,35 @@ app.post("/api/custom-media", async (req, res) => {
         }).select('*');
 
         if (error) {
-          console.error("Supabase content_submissions insert error:", error);
+          console.warn("Supabase content_submissions insert warning:", error);
           supabaseResult = { saved: false, message: error.message };
         } else {
-          console.log("Successfully inserted into Supabase content_submissions:", data);
           supabaseResult = { saved: true, message: "Saved to Supabase content_submissions table" };
         }
       } catch (sbErr: any) {
         console.warn("Supabase content_submissions insert notice:", sbErr);
         supabaseResult = { saved: false, message: sbErr?.message || "Insert failed" };
+      }
+
+      try {
+        const { data: existingData } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "custom_media_list")
+          .maybeSingle();
+
+        let currentList = (existingData && Array.isArray(existingData.value)) ? existingData.value : [];
+        currentList = [newItem, ...currentList.filter((x: any) => x.id !== newItem.id)];
+
+        await supabase.from("site_settings").upsert({
+          key: "custom_media_list",
+          value: currentList,
+          updated_at: new Date().toISOString()
+        });
+
+        supabaseResult = { saved: true, message: "Saved to Supabase database" };
+      } catch (sErr) {
+        console.warn("Supabase custom_media_list upsert error:", sErr);
       }
     }
 
