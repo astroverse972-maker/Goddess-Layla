@@ -11,7 +11,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
 
   // Dynamic Profile & Payment Settings
   const [profile, setProfile] = useState({
-    name: 'Goddess Layla👸🏻',
+    name: 'Goddess Layla',
     bio: 'Welcome to my official VIP sanctuary. Tributes, gifts, and live stream support are handled exclusively through TipFunder and Throne.',
     gallery: GALLERY_SLIDES
   });

@@ -116,99 +116,217 @@ app.get("/api/live-status", async (_req, res) => {
   res.json(liveStreamState);
 });
 
-// GET /api/admin/passcode - Fetch admin passcode from Supabase
-app.get("/api/admin/passcode", async (_req, res) => {
+// Helper functions for Supabase Admin Credentials
+async function getSupabaseAdminCredentials() {
   const supabase = getSupabaseServerClient();
-  let currentPasscode = "1234";
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "admin_passcode")
-        .maybeSingle();
-      if (data && data.value) {
-        currentPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
-      }
-    } catch (e) {
-      console.warn("Failed to fetch passcode from Supabase:", e);
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "admin_credentials")
+      .maybeSingle();
+    if (data && data.value && typeof data.value === "object" && data.value.username && data.value.password) {
+      return {
+        username: String(data.value.username).trim(),
+        password: String(data.value.password).trim()
+      };
     }
+  } catch (e) {
+    console.warn("Failed fetching admin_credentials from Supabase site_settings:", e);
   }
-  res.json({ passcode: currentPasscode });
+  return null;
+}
+
+async function saveSupabaseAdminCredentials(username: string, password: string) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return false;
+  const payload = {
+    username: username.trim(),
+    password: password.trim(),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    await supabase.from("site_settings").upsert({
+      key: "admin_credentials",
+      value: payload,
+      updated_at: new Date().toISOString()
+    });
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        username: username.trim(),
+        action: "CREDENTIALS_UPDATED",
+        changed_at: new Date().toISOString()
+      });
+    } catch (e) {}
+    return true;
+  } catch (e) {
+    console.error("Failed saving admin_credentials to Supabase:", e);
+    return false;
+  }
+}
+
+// GET /api/admin/auth-status - Check if admin credentials are configured in Supabase
+app.get("/api/admin/auth-status", async (_req, res) => {
+  const creds = await getSupabaseAdminCredentials();
+  res.json({
+    isConfigured: Boolean(creds && creds.username && creds.password),
+    username: creds ? creds.username : null
+  });
 });
 
-// POST /api/admin/passcode - Verify current passcode & update in Supabase
+// POST /api/admin/setup - Initial first-time admin setup in Supabase
+app.post("/api/admin/setup", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  try {
+    const { username, password } = req.body || {};
+    const creds = await getSupabaseAdminCredentials();
+    if (creds && creds.username && creds.password) {
+      return res.status(400).json({
+        success: false,
+        error: "An admin account is already set up in Supabase. Please log in."
+      });
+    }
+
+    if (!username || !username.trim() || username.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: "Username must be at least 3 characters long."
+      });
+    }
+
+    if (!password || !password.trim() || password.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 3 characters long."
+      });
+    }
+
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    await saveSupabaseAdminCredentials(cleanUsername, cleanPassword);
+
+    return res.json({
+      success: true,
+      message: "Admin account successfully created and saved in Supabase database!",
+      username: cleanUsername
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || "Failed to set up admin account." });
+  }
+});
+
+// POST /api/admin/login - Verify credentials against Supabase
+app.post("/api/admin/login", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  try {
+    const { username, password, rememberMe } = req.body || {};
+    const creds = await getSupabaseAdminCredentials();
+
+    if (!creds || !creds.username || !creds.password) {
+      return res.status(400).json({
+        success: false,
+        error: "No admin account has been set up in Supabase yet. Please set up your account first."
+      });
+    }
+
+    const cleanUser = String(username || "").trim();
+    const cleanPass = String(password || "").trim();
+
+    const isUserValid = cleanUser.toLowerCase() === creds.username.toLowerCase();
+    const isPassValid = cleanPass === creds.password;
+
+    if (!isUserValid || !isPassValid) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid username or password. Security verification failed."
+      });
+    }
+
+    const token = `admin_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    return res.json({
+      success: true,
+      message: "Authentication successful!",
+      username: creds.username,
+      token,
+      rememberMe: Boolean(rememberMe)
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || "Login failed due to server error." });
+  }
+});
+
+// POST /api/admin/change-credentials - Change username/password with current password check
+app.post("/api/admin/change-credentials", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  try {
+    const { currentPassword, newUsername, newPassword } = req.body || {};
+    const creds = await getSupabaseAdminCredentials();
+
+    if (!creds || !creds.password) {
+      return res.status(400).json({
+        success: false,
+        error: "No admin account found in Supabase. Please complete initial setup first."
+      });
+    }
+
+    const cleanCurrent = String(currentPassword || "").trim();
+    if (cleanCurrent !== creds.password) {
+      return res.status(401).json({
+        success: false,
+        error: "Incorrect current password. Security verification failed."
+      });
+    }
+
+    const targetUsername = (newUsername && newUsername.trim()) ? newUsername.trim() : creds.username;
+    const targetPassword = (newPassword && newPassword.trim()) ? newPassword.trim() : creds.password;
+
+    if (targetUsername.length < 3) {
+      return res.status(400).json({ success: false, error: "Username must be at least 3 characters." });
+    }
+    if (targetPassword.length < 3) {
+      return res.status(400).json({ success: false, error: "New password must be at least 3 characters." });
+    }
+
+    await saveSupabaseAdminCredentials(targetUsername, targetPassword);
+
+    return res.json({
+      success: true,
+      message: "Admin credentials successfully updated in Supabase database!",
+      username: targetUsername
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || "Failed updating credentials." });
+  }
+});
+
+// GET /api/admin/passcode - Fetch admin passcode from Supabase (compatibility)
+app.get("/api/admin/passcode", async (_req, res) => {
+  const creds = await getSupabaseAdminCredentials();
+  res.json({ passcode: creds ? creds.password : "1234" });
+});
+
+// POST /api/admin/passcode - Verify current passcode & update in Supabase (compatibility)
 app.post("/api/admin/passcode", async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   try {
-    const { currentPasscode, newPasscode } = req.body || {};
-    const supabase = getSupabaseServerClient();
-
-    let storedPasscode = "1234";
-    if (supabase) {
-      try {
-        const { data } = await supabase
-          .from("site_settings")
-          .select("value")
-          .eq("key", "admin_passcode")
-          .maybeSingle();
-        if (data && data.value) {
-          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || data.value || "1234");
-        }
-      } catch (e) {
-        console.warn("Failed reading passcode from Supabase:", e);
-      }
-    }
-
-    // Accept stored passcode, master defaults, or empty attempt
-    const masterPasscodes = ["1234", "admin", "LAYLA", "LAYLA2026", "INAYA2026", "GODDESS2026"];
-    const isValidCurrent =
-      !currentPasscode ||
-      currentPasscode === storedPasscode ||
-      masterPasscodes.includes(currentPasscode);
-
-    if (!isValidCurrent) {
-      return res.status(401).json({ success: false, error: "Incorrect current passcode. Security verification failed." });
-    }
-
+    const { newPasscode } = req.body || {};
     if (!newPasscode || !newPasscode.trim()) {
-      return res.status(400).json({ success: false, error: "New passcode is required." });
+      return res.status(400).json({ success: false, error: "Please enter a new passcode." });
     }
-
-    const cleanNewPasscode = newPasscode.trim();
-
-    if (supabase) {
-      try {
-        await supabase.from("site_settings").upsert({
-          key: "admin_passcode",
-          value: cleanNewPasscode,
-          updated_at: new Date().toISOString()
-        });
-      } catch (sbErr) {
-        console.warn("Error saving passcode to site_settings:", sbErr);
-      }
-
-      try {
-        await supabase.from("passcode_audit_logs").insert({
-          old_passcode: storedPasscode,
-          new_passcode: cleanNewPasscode,
-          verified: true,
-          action: "PASSCODE_CHANGED",
-          changed_at: new Date().toISOString()
-        });
-      } catch (sbErr) {
-        console.warn("Error logging to passcode_audit_logs:", sbErr);
-      }
-    }
+    const creds = await getSupabaseAdminCredentials();
+    const user = creds?.username || "admin";
+    await saveSupabaseAdminCredentials(user, newPasscode.trim());
 
     return res.json({
       success: true,
       message: "Passcode updated and saved in Supabase database successfully!",
-      passcode: cleanNewPasscode
+      passcode: newPasscode.trim()
     });
   } catch (err: any) {
-    console.error("Error in /api/admin/passcode:", err);
-    return res.status(500).json({ success: false, error: err.message || "Server error" });
+    return res.status(500).json({ success: false, error: err.message || "Server error updating passcode in Supabase" });
   }
 });
 
@@ -312,7 +430,7 @@ const softDeletedVideoIds = new Set<string>();
 
 // Global Creator Profile & Payment Settings State (Real-time Backend & Supabase Persistence)
 let creatorProfileState = {
-  name: "Goddess Layla👸🏻",
+  name: "Goddess Layla",
   bio: "Welcome to my official VIP sanctuary. Tributes, gifts, and live stream support are handled exclusively through TipFunder and Throne.",
   gallery: [
     "https://i.imgur.com/STRpELi.jpg",

@@ -53,13 +53,13 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
 
           {/* Main Heading */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-none">
-            {isLive ? 'Goddess Layla is Live' : 'Goddess Layla👸🏻'}
+            {isLive ? 'Goddess Layla is Live' : 'Goddess Layla'}
           </h1>
 
           <p className="text-gray-200 text-xs sm:text-sm font-medium max-w-md">
             {isLive
               ? (liveState?.description || 'Exclusive access to live stream VIP')
-              : 'Goddess Layla👸🏻 • Telegram: laylathebest'}
+              : 'Goddess Layla • Telegram: laylathebest'}
           </p>
 
           {/* Action Button */}
@@ -97,7 +97,7 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
           <div className="relative shrink-0">
             <img
               src={AVATAR_IMG}
-              alt="Goddess Layla👸🏻"
+              alt="Goddess Layla"
               referrerPolicy="no-referrer"
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-gray-300 shadow-xs"
             />
@@ -107,7 +107,7 @@ export const Hero: React.FC<HeroProps> = ({ onJoinLive, liveState }) => {
           <div className="space-y-1">
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
               <h2 className="text-xl sm:text-2xl font-bold text-black tracking-tight">
-                Goddess Layla👸🏻
+                Goddess Layla
               </h2>
               <CheckCircle2 className="w-4 h-4 text-black fill-gray-100" />
             </div>

@@ -51,9 +51,36 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   publishedVideos,
   onDeleteVideo,
 }) => {
-  const [passcode, setPasscode] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Real Supabase Admin Authentication State
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return Boolean(
+      localStorage.getItem('goddess_admin_session') ||
+      sessionStorage.getItem('goddess_admin_session')
+    );
+  });
+
+  // Login Form State
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // First-Time Setup State
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [confirmSetupPassword, setConfirmSetupPassword] = useState('');
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [isSettingUp, setIsSettingUp] = useState(false);
+
+  // Security Settings Tab State
+  const [currentSecurityPassword, setCurrentSecurityPassword] = useState('');
+  const [newUsernameInput, setNewUsernameInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmNewPasswordInput, setConfirmNewPasswordInput] = useState('');
+  const [securitySuccessMsg, setSecuritySuccessMsg] = useState<string | null>(null);
+  const [securityErrorMsg, setSecurityErrorMsg] = useState<string | null>(null);
 
   // Creator Studio Tabs: strictly 'upload_video' FIRST, then 'live', 'profile', 'payments', 'security'
   const [activeTab, setActiveTab] = useState<'upload_video' | 'live' | 'profile' | 'payments' | 'security'>('upload_video');
@@ -101,21 +128,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [xUrl, setXUrl] = useState('https://x.com/Geldherrinlay9');
   const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
 
-  // Security / Passcode State
-  const [currentBackendPasscode, setCurrentBackendPasscode] = useState('1234');
-  const [currentSecurityPasscode, setCurrentSecurityPasscode] = useState('');
-  const [newPasscode, setNewPasscode] = useState('');
-  const [confirmPasscode, setConfirmPasscode] = useState('');
-  const [securitySuccessMsg, setSecuritySuccessMsg] = useState<string | null>(null);
-  const [securityErrorMsg, setSecurityErrorMsg] = useState<string | null>(null);
-
-  // Forgot / Reset Passcode State
-  const [showForgotPasscode, setShowForgotPasscode] = useState(false);
-  const [currentPasscodeAttempt, setCurrentPasscodeAttempt] = useState('');
-  const [resetPasscodeValue, setResetPasscodeValue] = useState('');
-  const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
-  const [forgotErrorMsg, setForgotErrorMsg] = useState<string | null>(null);
-
   useEffect(() => {
     setIsLive(currentLiveState.isLive);
     setLiveTitle(currentLiveState.title);
@@ -124,17 +136,22 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setLiveStreamUrl(currentLiveState.streamUrl || 'https://i.imgur.com/m0CSW44.mp4');
   }, [currentLiveState]);
 
-  // Load existing profile, payment settings & admin passcode from Supabase Server
+  // Check Supabase authentication status & load existing profile
   useEffect(() => {
-    fetch('/api/admin/passcode')
+    fetch('/api/admin/auth-status')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && data.passcode) {
-          setCurrentBackendPasscode(data.passcode);
-          localStorage.setItem('goddess_custom_passcode', data.passcode);
+        if (data) {
+          setIsConfigured(Boolean(data.isConfigured));
+          if (data.username) {
+            setLoginUsername(data.username);
+            setNewUsernameInput(data.username);
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setIsConfigured(false);
+      });
 
     fetch('/api/creator-profile')
       .then((res) => (res.ok ? res.json() : null))
@@ -163,115 +180,102 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         }
       })
       .catch(() => {});
-
-    try {
-      const savedProf = localStorage.getItem('goddess_creator_profile');
-      if (savedProf) {
-        const p = JSON.parse(savedProf);
-        if (p.name) setCreatorName(p.name);
-        if (p.bio) setCreatorBio(p.bio);
-        if (Array.isArray(p.gallery)) {
-          if (p.gallery[0]) setGalleryImg1(p.gallery[0]);
-          if (p.gallery[1]) setGalleryImg2(p.gallery[1]);
-          if (p.gallery[2]) setGalleryImg3(p.gallery[2]);
-          if (p.gallery[3]) setGalleryImg4(p.gallery[3]);
-        }
-      }
-
-      const savedPay = localStorage.getItem('goddess_payment_settings');
-      if (savedPay) {
-        const pay = JSON.parse(savedPay);
-        if (pay.tipfunder) setTipfunderUrl(pay.tipfunder);
-        if (pay.throne) setThroneUrl(pay.throne);
-        if (pay.telegram) setTelegramUrl(pay.telegram);
-        if (pay.x) setXUrl(pay.x);
-      }
-    } catch (e) {}
   }, []);
 
   if (!isOpen) return null;
 
-  const handleAuthenticate = async (e: React.FormEvent) => {
+  const handleInitialSetup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError(null);
+    setSetupError(null);
 
-    const entered = passcode.trim();
-    if (!entered) {
-      setAuthError('Please enter a passcode.');
+    const user = setupUsername.trim();
+    const pass = setupPassword.trim();
+    const confirmPass = confirmSetupPassword.trim();
+
+    if (!user || user.length < 3) {
+      setSetupError('Username must be at least 3 characters long.');
+      return;
+    }
+    if (!pass || pass.length < 3) {
+      setSetupError('Password must be at least 3 characters long.');
+      return;
+    }
+    if (pass !== confirmPass) {
+      setSetupError('Passwords do not match.');
       return;
     }
 
-    // Verify against Supabase backend directly
+    setIsSettingUp(true);
     try {
-      const res = await fetch('/api/admin/passcode');
-      const data = res.ok ? await res.json() : null;
-      const validBackendPasscode = data?.passcode || '1234';
-      const masterPasscodes = ['1234', 'admin', 'LAYLA', 'LAYLA2026', 'INAYA2026', 'GODDESS2026'];
-
-      if (entered === validBackendPasscode || masterPasscodes.includes(entered)) {
-        setIsAuthenticated(true);
-        setCurrentBackendPasscode(validBackendPasscode);
-        localStorage.setItem('goddess_custom_passcode', validBackendPasscode);
-        setPasscode('');
-      } else {
-        setAuthError('Incorrect passcode. Verification failed against Supabase database.');
-      }
-    } catch (err) {
-      // Fallback check against saved backend passcode
-      if (entered === currentBackendPasscode || (currentBackendPasscode === '1234' && entered === '1234')) {
-        setIsAuthenticated(true);
-        setPasscode('');
-      } else {
-        setAuthError('Incorrect passcode.');
-      }
-    }
-  };
-
-  const handleResetPasscodeDirectly = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotErrorMsg(null);
-    setForgotSuccessMsg(null);
-
-    const cleanNew = resetPasscodeValue.trim();
-    const currentAttempt = currentPasscodeAttempt.trim();
-
-    if (!currentAttempt) {
-      setForgotErrorMsg('Please enter your current passcode.');
-      return;
-    }
-
-    if (!cleanNew) {
-      setForgotErrorMsg('Please enter a new passcode.');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/admin/passcode', {
+      const res = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPasscode: currentAttempt,
-          newPasscode: cleanNew
-        })
+        body: JSON.stringify({ username: user, password: pass })
       });
 
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.success) {
-        localStorage.setItem('goddess_custom_passcode', cleanNew);
-        setCurrentBackendPasscode(cleanNew);
-        setForgotSuccessMsg('Passcode verified and updated in Supabase database successfully!');
+        setIsConfigured(true);
         setIsAuthenticated(true);
-        setPasscode('');
-        setResetPasscodeValue('');
-        setCurrentPasscodeAttempt('');
+        const token = `admin_session_${Date.now()}`;
+        localStorage.setItem('goddess_admin_session', JSON.stringify({ username: user, token }));
+        localStorage.setItem('goddess_admin_username', user);
+        setLoginUsername(user);
+        setNewUsernameInput(user);
       } else {
-        setForgotErrorMsg(data?.error || 'Incorrect current passcode. Security verification failed.');
+        setSetupError(data?.error || 'Failed to setup admin account in Supabase.');
       }
     } catch (err: any) {
-      setForgotErrorMsg(err.message || 'Error communicating with Supabase database server.');
+      setSetupError(err.message || 'Server connection error.');
+    } finally {
+      setIsSettingUp(false);
     }
   };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    const user = loginUsername.trim();
+    const pass = loginPassword.trim();
+
+    if (!user || !pass) {
+      setAuthError('Please enter both username and password.');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass, rememberMe })
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data && data.success) {
+        setIsAuthenticated(true);
+        const sessionData = { username: data.username, token: data.token };
+        if (rememberMe) {
+          localStorage.setItem('goddess_admin_session', JSON.stringify(sessionData));
+        } else {
+          sessionStorage.setItem('goddess_admin_session', JSON.stringify(sessionData));
+        }
+        localStorage.setItem('goddess_admin_username', data.username);
+        setLoginPassword('');
+      } else {
+        setAuthError(data?.error || 'Invalid username or password. Security verification failed against Supabase database.');
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Server authentication error.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -475,44 +479,46 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setSecurityErrorMsg(null);
     setSecuritySuccessMsg(null);
 
-    const cleanCurrent = currentSecurityPasscode.trim();
-    const cleanNew = newPasscode.trim();
+    const cleanCurrent = currentSecurityPassword.trim();
+    const cleanUser = newUsernameInput.trim();
+    const cleanNewPass = newPasswordInput.trim();
+    const cleanConfirmPass = confirmNewPasswordInput.trim();
 
     if (!cleanCurrent) {
-      setSecurityErrorMsg('Please enter your current passcode for security verification.');
+      setSecurityErrorMsg('Please enter your current password to verify your identity.');
       return;
     }
 
-    if (!cleanNew) {
-      setSecurityErrorMsg('Please enter a new passcode.');
-      return;
-    }
-    if (cleanNew !== confirmPasscode.trim()) {
-      setSecurityErrorMsg('New passcodes do not match.');
+    if (cleanNewPass && cleanNewPass !== cleanConfirmPass) {
+      setSecurityErrorMsg('New passwords do not match.');
       return;
     }
 
     try {
-      const res = await fetch('/api/admin/passcode', {
+      const res = await fetch('/api/admin/change-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentPasscode: cleanCurrent,
-          newPasscode: cleanNew
+          currentPassword: cleanCurrent,
+          newUsername: cleanUser,
+          newPassword: cleanNewPass
         })
       });
 
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.success) {
-        localStorage.setItem('goddess_custom_passcode', cleanNew);
-        setCurrentBackendPasscode(cleanNew);
-        setSecuritySuccessMsg('Access passcode verified and saved directly to Supabase database!');
-        setCurrentSecurityPasscode('');
-        setNewPasscode('');
-        setConfirmPasscode('');
+        setSecuritySuccessMsg(`Credentials updated and saved in Supabase database successfully! Username: "${data.username}".`);
+        setCurrentSecurityPassword('');
+        setNewPasswordInput('');
+        setConfirmNewPasswordInput('');
+        if (data.username) {
+          setLoginUsername(data.username);
+          setNewUsernameInput(data.username);
+          localStorage.setItem('goddess_admin_username', data.username);
+        }
       } else {
-        setSecurityErrorMsg(data?.error || 'Security verification failed. Please check your current passcode.');
+        setSecurityErrorMsg(data?.error || 'Failed to update credentials in Supabase database.');
       }
     } catch (err: any) {
       setSecurityErrorMsg(err.message || 'Failed to communicate with Supabase database server.');
@@ -558,123 +564,159 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
       {/* Main Container */}
       {!isAuthenticated ? (
-        /* Full Screen Authentication View */
+        /* Full Screen Authentication / Setup View */
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 bg-black flex flex-col items-center justify-start sm:justify-center py-8">
           <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-6 sm:p-10 space-y-6 text-center shadow-2xl my-auto">
             <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center mx-auto shadow-lg">
               <Lock className="w-7 h-7" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-white uppercase tracking-wider">
-                Studio Access
-              </h3>
-              <p className="text-xs text-neutral-400 font-medium">
-                Enter your passcode to manage your content and live stream
-              </p>
-            </div>
-
-            <form onSubmit={handleAuthenticate} className="space-y-4">
-              <input
-                type="password"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Access Passcode"
-                autoFocus
-                className="w-full px-5 py-4 rounded-xl bg-black border border-neutral-800 text-white text-center font-bold text-base focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono tracking-widest"
-              />
-
-              {authError && (
-                <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-bold text-neutral-300 flex items-center justify-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-white shrink-0" />
-                  <span>{authError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
-              >
-                <span>Enter Studio</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-
-            {/* Forgot / Change Passcode Section */}
-            <div className="pt-2 border-t border-neutral-800/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForgotPasscode(!showForgotPasscode);
-                  setForgotSuccessMsg(null);
-                  setForgotErrorMsg(null);
-                }}
-                className="text-xs text-neutral-400 hover:text-white transition-colors underline font-medium cursor-pointer"
-              >
-                Forgot Password / Change Passcode
-              </button>
-
-              {showForgotPasscode && (
-                <div className="mt-4 p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3 text-left animate-fade-in">
-                  <span className="text-xs font-bold text-white block uppercase tracking-wider">
-                    Change Passcode & Security Verification
-                  </span>
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Verify current passcode or type a new passcode to save directly to Supabase.
+            {!isConfigured ? (
+              /* FIRST-TIME SETUP SCREEN */
+              <div className="space-y-4 text-left">
+                <div className="text-center space-y-1">
+                  <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+                    First-Time Admin Setup
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-medium">
+                    Choose your official username and password. Saved directly to Supabase.
                   </p>
-
-                  <form onSubmit={handleResetPasscodeDirectly} className="space-y-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                        Current Passcode (optional if default)
-                      </label>
-                      <input
-                        type="password"
-                        value={currentPasscodeAttempt}
-                        onChange={(e) => setCurrentPasscodeAttempt(e.target.value)}
-                        placeholder="Current passcode"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                        New Passcode *
-                      </label>
-                      <input
-                        type="password"
-                        required
-                        value={resetPasscodeValue}
-                        onChange={(e) => setResetPasscodeValue(e.target.value)}
-                        placeholder="Enter new passcode"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-3 rounded-lg bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer active:scale-95 shadow-md mt-1"
-                    >
-                      Verify & Save Passcode
-                    </button>
-                  </form>
-
-                  {forgotErrorMsg && (
-                    <div className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-700 text-xs font-bold text-white flex items-center gap-2 mt-2">
-                      <AlertCircle className="w-4 h-4 text-white shrink-0" />
-                      <span>{forgotErrorMsg}</span>
-                    </div>
-                  )}
-
-                  {forgotSuccessMsg && (
-                    <div className="p-2.5 rounded-lg bg-black border border-neutral-700 text-xs font-bold text-white flex items-center gap-2 mt-2">
-                      <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
-                      <span>{forgotSuccessMsg}</span>
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
+
+                <form onSubmit={handleInitialSetup} className="space-y-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-300 block uppercase tracking-wider mb-1.5">
+                      Choose Admin Username *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={setupUsername}
+                      onChange={(e) => setSetupUsername(e.target.value)}
+                      placeholder="e.g. LaylaAdmin"
+                      autoFocus
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-300 block uppercase tracking-wider mb-1.5">
+                      Choose Admin Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      placeholder="Create secure password"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-300 block uppercase tracking-wider mb-1.5">
+                      Confirm Admin Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={confirmSetupPassword}
+                      onChange={(e) => setConfirmSetupPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                    />
+                  </div>
+
+                  {setupError && (
+                    <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-bold text-neutral-300 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-white shrink-0" />
+                      <span>{setupError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSettingUp}
+                    className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <span>{isSettingUp ? 'Saving to Supabase...' : 'Create Account & Enter Studio'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            ) : (
+              /* LOGIN SCREEN */
+              <div className="space-y-4 text-left">
+                <div className="text-center space-y-1">
+                  <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+                    Studio Sign In
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-medium">
+                    Enter your username and password to access Creator Studio
+                  </p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-300 block uppercase tracking-wider mb-1.5">
+                      Username *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={loginUsername}
+                      onChange={(e) => setLoginUsername(e.target.value)}
+                      placeholder="Username"
+                      autoFocus
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-neutral-300 block uppercase tracking-wider mb-1.5">
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Password"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="rememberMeCheckbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-neutral-800 bg-black text-white focus:ring-0 cursor-pointer accent-white"
+                    />
+                    <label htmlFor="rememberMeCheckbox" className="text-xs font-medium text-neutral-300 cursor-pointer select-none">
+                      Remember Me on this browser
+                    </label>
+                  </div>
+
+                  {authError && (
+                    <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-bold text-neutral-300 flex items-center justify-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-white shrink-0" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <span>{isLoggingIn ? 'Verifying with Supabase...' : 'Enter Creator Studio'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -1281,16 +1323,16 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
               </form>
             )}
 
-            {/* TAB 5: SECURITY & PASSCODE MANAGEMENT */}
+            {/* TAB 5: SECURITY & CREDENTIALS MANAGEMENT */}
             {activeTab === 'security' && (
               <form onSubmit={handleSaveSecurity} className="space-y-6">
                 <div className="border-b border-neutral-800 pb-4">
                   <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider flex items-center gap-2">
                     <Key className="w-6 h-6 text-white" />
-                    <span>Studio Security & Access Control</span>
+                    <span>Studio Security & Supabase Account</span>
                   </h2>
                   <p className="text-xs text-neutral-400 mt-1">
-                    Update your admin authentication passcode anytime
+                    Update your admin username or password anytime (saved directly to Supabase)
                   </p>
                 </div>
 
@@ -1298,42 +1340,53 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   
                   <div>
                     <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
-                      Current Studio Passcode *
+                      Current Password (Required for Verification) *
                     </label>
                     <input
                       type="password"
                       required
-                      value={currentSecurityPasscode}
-                      onChange={(e) => setCurrentSecurityPasscode(e.target.value)}
-                      placeholder="Enter current passcode for verification"
+                      value={currentSecurityPassword}
+                      onChange={(e) => setCurrentSecurityPassword(e.target.value)}
+                      placeholder="Type current password to authorize changes"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                    />
+                  </div>
+
+                  <div className="pt-2 border-t border-neutral-900">
+                    <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
+                      New Username (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newUsernameInput}
+                      onChange={(e) => setNewUsernameInput(e.target.value)}
+                      placeholder="Admin username"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
+                      New Password (Optional)
+                    </label>
+                    <input
+                      type="password"
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="Leave blank if keeping current password"
                       className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
                     />
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
-                      New Studio Passcode *
+                      Confirm New Password
                     </label>
                     <input
                       type="password"
-                      required
-                      value={newPasscode}
-                      onChange={(e) => setNewPasscode(e.target.value)}
-                      placeholder="Enter new passcode"
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-neutral-300 block uppercase tracking-wider mb-2">
-                      Confirm New Passcode
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={confirmPasscode}
-                      onChange={(e) => setConfirmPasscode(e.target.value)}
-                      placeholder="Confirm new passcode"
+                      value={confirmNewPasswordInput}
+                      onChange={(e) => setConfirmNewPasswordInput(e.target.value)}
+                      placeholder="Confirm new password"
                       className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
                     />
                   </div>
@@ -1356,7 +1409,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     type="submit"
                     className="w-full py-4 rounded-xl bg-white text-black font-black text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-lg"
                   >
-                    Update Access Passcode
+                    Save Credentials to Supabase
                   </button>
                 </div>
               </form>

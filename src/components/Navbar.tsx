@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="cursor-pointer group flex items-center gap-2 select-none"
         >
           <span className="font-serif text-xl sm:text-2xl font-extrabold text-black tracking-tight transition-colors">
-            Goddess Layla👸🏻
+            Goddess Layla
           </span>
         </div>
 

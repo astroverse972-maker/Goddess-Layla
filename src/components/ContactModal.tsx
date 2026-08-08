@@ -42,7 +42,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase font-sans">
-            Goddess Layla👸🏻 - Contact & Booking
+            Goddess Layla - Contact & Booking
           </span>
           <button
             onClick={onClose}
@@ -56,7 +56,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         <div className="p-6 sm:p-8 space-y-6">
           
           <div className="text-center space-y-1">
-            <h4 className="font-serif text-2xl font-bold text-black">Goddess Layla👸🏻</h4>
+            <h4 className="font-serif text-2xl font-bold text-black">Goddess Layla</h4>
             <p className="text-xs text-gray-500 font-medium">
               Telegram: laylathebest • VIP Space
             </p>

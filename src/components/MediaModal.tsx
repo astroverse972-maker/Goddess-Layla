@@ -143,7 +143,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase font-sans flex items-center gap-2">
-            <span>Goddess Layla👸🏻 — {unlocked ? 'Full Video Unlocked' : 'Preview Video'}</span>
+            <span>Goddess Layla — {unlocked ? 'Full Video Unlocked' : 'Preview Video'}</span>
             {unlocked && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-bold">VERIFIED</span>}
           </span>
           

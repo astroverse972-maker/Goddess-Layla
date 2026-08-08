@@ -18,7 +18,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
           {/* Brand */}
           <div className="flex flex-col items-center md:items-start space-y-1 text-center md:text-left">
             <div className="font-serif text-2xl font-bold tracking-tight text-black">
-              Goddess Layla👸🏻
+              Goddess Layla
             </div>
             <p className="text-xs text-gray-700 font-medium mt-0.5">
               Telegram: laylathebest • VIP Sanctuary
@@ -82,7 +82,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
           <div className="select-none cursor-default">
-            © {new Date().getFullYear()} Goddess Layla👸🏻. All rights reserved. VIP Space 18+.
+            © {new Date().getFullYear()} Goddess Layla. All rights reserved. VIP Space 18+.
           </div>
         </div>
 
