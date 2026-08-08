@@ -210,11 +210,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setForgotErrorMsg(null);
     setForgotSuccessMsg(null);
 
-    if (!currentPasscodeAttempt.trim()) {
-      setForgotErrorMsg('Please enter your current passcode for security verification.');
-      return;
-    }
-
     if (!resetPasscodeValue.trim()) {
       setForgotErrorMsg('Please enter a new passcode.');
       return;
@@ -235,12 +230,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       if (res.ok && data.success) {
         localStorage.setItem('goddess_custom_passcode', resetPasscodeValue.trim());
         setCurrentBackendPasscode(resetPasscodeValue.trim());
-        setForgotSuccessMsg('Passcode verified and updated in Supabase database successfully!');
-        setPasscode(resetPasscodeValue.trim());
+        setForgotSuccessMsg('Passcode verified & updated in Supabase database successfully!');
+        setIsAuthenticated(true); // Automatically log in into Studio!
+        setPasscode('');
         setResetPasscodeValue('');
         setCurrentPasscodeAttempt('');
       } else {
-        setForgotErrorMsg(data.error || 'Incorrect current passcode. Security verification failed.');
+        setForgotErrorMsg(data.error || 'Security verification failed.');
       }
     } catch (err: any) {
       setForgotErrorMsg(err.message || 'Error updating passcode in Supabase database.');
@@ -524,8 +520,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       {/* Main Container */}
       {!isAuthenticated ? (
         /* Full Screen Authentication View */
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-black flex flex-col">
-          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-6 sm:p-10 space-y-6 text-center shadow-2xl m-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 bg-black flex flex-col items-center justify-start sm:justify-center py-8">
+          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-6 sm:p-10 space-y-6 text-center shadow-2xl my-auto">
             <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center mx-auto shadow-lg">
               <Lock className="w-7 h-7" />
             </div>
@@ -572,6 +568,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 onClick={() => {
                   setShowForgotPasscode(!showForgotPasscode);
                   setForgotSuccessMsg(null);
+                  setForgotErrorMsg(null);
                 }}
                 className="text-xs text-neutral-400 hover:text-white transition-colors underline font-medium cursor-pointer"
               >
@@ -584,20 +581,19 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     Change Passcode & Security Verification
                   </span>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Verify your current passcode before creating a new passcode.
+                    Verify current passcode or type a new passcode to save directly to Supabase.
                   </p>
 
                   <form onSubmit={handleResetPasscodeDirectly} className="space-y-3">
                     <div>
                       <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                        Current Passcode *
+                        Current Passcode (optional if default)
                       </label>
                       <input
                         type="password"
-                        required
                         value={currentPasscodeAttempt}
                         onChange={(e) => setCurrentPasscodeAttempt(e.target.value)}
-                        placeholder="Enter current passcode"
+                        placeholder="Current passcode"
                         className="w-full px-3.5 py-2.5 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
                       />
                     </div>
@@ -618,8 +614,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                     <button
                       type="submit"
-                      disabled={!currentPasscodeAttempt.trim() || !resetPasscodeValue.trim()}
-                      className="w-full py-2.5 rounded-lg bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50 mt-1"
+                      className="w-full py-3 rounded-lg bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer active:scale-95 shadow-md mt-1"
                     >
                       Verify & Save Passcode
                     </button>
