@@ -139,8 +139,9 @@ app.get("/api/admin/passcode", async (_req, res) => {
 
 // POST /api/admin/passcode - Verify current passcode & update in Supabase
 app.post("/api/admin/passcode", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   try {
-    const { currentPasscode, newPasscode } = req.body;
+    const { currentPasscode, newPasscode } = req.body || {};
     const supabase = getSupabaseServerClient();
 
     let storedPasscode = "1234";
@@ -152,9 +153,11 @@ app.post("/api/admin/passcode", async (req, res) => {
           .eq("key", "admin_passcode")
           .maybeSingle();
         if (data && data.value) {
-          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
+          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || data.value || "1234");
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Failed reading passcode from Supabase:", e);
+      }
     }
 
     const isValidCurrent =
@@ -167,11 +170,11 @@ app.post("/api/admin/passcode", async (req, res) => {
       currentPasscode === "INAYA2026";
 
     if (!isValidCurrent) {
-      return res.status(401).json({ error: "Incorrect current passcode. Verification failed." });
+      return res.status(401).json({ success: false, error: "Incorrect current passcode. Verification failed." });
     }
 
     if (!newPasscode || !newPasscode.trim()) {
-      return res.status(400).json({ error: "New passcode is required." });
+      return res.status(400).json({ success: false, error: "New passcode is required." });
     }
 
     const cleanNewPasscode = newPasscode.trim();
@@ -183,8 +186,11 @@ app.post("/api/admin/passcode", async (req, res) => {
           value: cleanNewPasscode,
           updated_at: new Date().toISOString()
         });
+      } catch (sbErr) {
+        console.warn("Error saving passcode to site_settings:", sbErr);
+      }
 
-        // Log passcode change into security audit history table
+      try {
         await supabase.from("passcode_audit_logs").insert({
           old_passcode: storedPasscode,
           new_passcode: cleanNewPasscode,
@@ -193,7 +199,7 @@ app.post("/api/admin/passcode", async (req, res) => {
           changed_at: new Date().toISOString()
         });
       } catch (sbErr) {
-        console.warn("Error saving passcode to Supabase site_settings / passcode_audit_logs:", sbErr);
+        console.warn("Error logging to passcode_audit_logs:", sbErr);
       }
     }
 
@@ -203,7 +209,8 @@ app.post("/api/admin/passcode", async (req, res) => {
       passcode: cleanNewPasscode
     });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error("Error in /api/admin/passcode:", err);
+    return res.status(500).json({ success: false, error: err.message || "Server error" });
   }
 });
 
