@@ -121,11 +121,15 @@ async function getSupabaseAdminCredentials() {
   const supabase = getSupabaseServerClient();
   if (!supabase) return null;
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("site_settings")
       .select("value")
       .eq("key", "admin_credentials")
       .maybeSingle();
+    if (error) {
+      console.warn("Error reading admin_credentials from Supabase:", error.message);
+      return null;
+    }
     if (data && data.value && typeof data.value === "object" && data.value.username && data.value.password) {
       return {
         username: String(data.value.username).trim(),
@@ -140,18 +144,26 @@ async function getSupabaseAdminCredentials() {
 
 async function saveSupabaseAdminCredentials(username: string, password: string) {
   const supabase = getSupabaseServerClient();
-  if (!supabase) return false;
+  if (!supabase) {
+    return { success: false, error: "Supabase client not initialized. Check database connection." };
+  }
   const payload = {
     username: username.trim(),
     password: password.trim(),
     updated_at: new Date().toISOString()
   };
   try {
-    await supabase.from("site_settings").upsert({
+    const { error } = await supabase.from("site_settings").upsert({
       key: "admin_credentials",
       value: payload,
       updated_at: new Date().toISOString()
     });
+
+    if (error) {
+      console.error("Failed saving admin_credentials to Supabase site_settings:", error);
+      return { success: false, error: error.message || "Supabase database write failed." };
+    }
+
     try {
       await supabase.from("admin_audit_logs").insert({
         username: username.trim(),
@@ -159,10 +171,11 @@ async function saveSupabaseAdminCredentials(username: string, password: string) 
         changed_at: new Date().toISOString()
       });
     } catch (e) {}
-    return true;
-  } catch (e) {
-    console.error("Failed saving admin_credentials to Supabase:", e);
-    return false;
+
+    return { success: true };
+  } catch (e: any) {
+    console.error("Exception saving admin_credentials to Supabase:", e);
+    return { success: false, error: e.message || "Unexpected server error." };
   }
 }
 
@@ -205,7 +218,14 @@ app.post("/api/admin/setup", async (req, res) => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
-    await saveSupabaseAdminCredentials(cleanUsername, cleanPassword);
+    const saveResult = await saveSupabaseAdminCredentials(cleanUsername, cleanPassword);
+
+    if (!saveResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: `Supabase Error: ${saveResult.error}`
+      });
+    }
 
     return res.json({
       success: true,
