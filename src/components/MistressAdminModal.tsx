@@ -191,17 +191,38 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleAuthenticate = (e: React.FormEvent) => {
+  const handleAuthenticate = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
-    const savedPasscode = localStorage.getItem('goddess_custom_passcode') || currentBackendPasscode || '1234';
     const entered = passcode.trim();
-    if (entered === savedPasscode || entered === currentBackendPasscode || entered === '1234' || entered === 'admin' || entered === 'LAYLA') {
-      setIsAuthenticated(true);
-      setPasscode('');
-    } else {
-      setAuthError('Incorrect passcode. Please try again.');
+    if (!entered) {
+      setAuthError('Please enter a passcode.');
+      return;
+    }
+
+    // Verify against Supabase backend directly
+    try {
+      const res = await fetch('/api/admin/passcode');
+      const data = res.ok ? await res.json() : null;
+      const validBackendPasscode = data?.passcode || '1234';
+
+      if (entered === validBackendPasscode) {
+        setIsAuthenticated(true);
+        setCurrentBackendPasscode(validBackendPasscode);
+        localStorage.setItem('goddess_custom_passcode', validBackendPasscode);
+        setPasscode('');
+      } else {
+        setAuthError('Incorrect passcode. Verification failed against Supabase database.');
+      }
+    } catch (err) {
+      // Fallback check against saved backend passcode
+      if (entered === currentBackendPasscode || (currentBackendPasscode === '1234' && entered === '1234')) {
+        setIsAuthenticated(true);
+        setPasscode('');
+      } else {
+        setAuthError('Incorrect passcode.');
+      }
     }
   };
 
@@ -211,54 +232,43 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setForgotSuccessMsg(null);
 
     const cleanNew = resetPasscodeValue.trim();
+    const currentAttempt = currentPasscodeAttempt.trim();
+
+    if (!currentAttempt) {
+      setForgotErrorMsg('Please enter your current passcode.');
+      return;
+    }
+
     if (!cleanNew) {
       setForgotErrorMsg('Please enter a new passcode.');
       return;
     }
-
-    // Instantly save to local storage for immediate access
-    localStorage.setItem('goddess_custom_passcode', cleanNew);
-    setCurrentBackendPasscode(cleanNew);
 
     try {
       const res = await fetch('/api/admin/passcode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentPasscode: currentPasscodeAttempt.trim(),
+          currentPasscode: currentAttempt,
           newPasscode: cleanNew
         })
       });
 
-      let data: any = null;
-      try {
-        const text = await res.text();
-        if (text) data = JSON.parse(text);
-      } catch (e) {
-        data = { success: true };
-      }
+      const data = await res.json().catch(() => null);
 
-      if (res.ok && data && data.success !== false) {
-        setForgotSuccessMsg('Passcode verified & updated in Supabase database successfully!');
-        setIsAuthenticated(true); // Automatically log into Creator Studio!
-        setPasscode('');
-        setResetPasscodeValue('');
-        setCurrentPasscodeAttempt('');
-      } else if (data && data.error) {
-        setForgotErrorMsg(data.error);
-      } else {
-        setForgotSuccessMsg('Passcode verified & updated successfully!');
+      if (res.ok && data && data.success) {
+        localStorage.setItem('goddess_custom_passcode', cleanNew);
+        setCurrentBackendPasscode(cleanNew);
+        setForgotSuccessMsg('Passcode verified and updated in Supabase database successfully!');
         setIsAuthenticated(true);
         setPasscode('');
         setResetPasscodeValue('');
         setCurrentPasscodeAttempt('');
+      } else {
+        setForgotErrorMsg(data?.error || 'Incorrect current passcode. Security verification failed.');
       }
     } catch (err: any) {
-      setForgotSuccessMsg('Passcode updated!');
-      setIsAuthenticated(true);
-      setPasscode('');
-      setResetPasscodeValue('');
-      setCurrentPasscodeAttempt('');
+      setForgotErrorMsg(err.message || 'Error communicating with Supabase database server.');
     }
   };
 
@@ -464,16 +474,19 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setSecurityErrorMsg(null);
     setSecuritySuccessMsg(null);
 
-    if (!currentSecurityPasscode.trim()) {
+    const cleanCurrent = currentSecurityPasscode.trim();
+    const cleanNew = newPasscode.trim();
+
+    if (!cleanCurrent) {
       setSecurityErrorMsg('Please enter your current passcode for security verification.');
       return;
     }
 
-    if (!newPasscode.trim()) {
+    if (!cleanNew) {
       setSecurityErrorMsg('Please enter a new passcode.');
       return;
     }
-    if (newPasscode !== confirmPasscode) {
+    if (cleanNew !== confirmPasscode.trim()) {
       setSecurityErrorMsg('New passcodes do not match.');
       return;
     }
@@ -483,43 +496,25 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentPasscode: currentSecurityPasscode.trim(),
-          newPasscode: newPasscode.trim()
+          currentPasscode: cleanCurrent,
+          newPasscode: cleanNew
         })
       });
 
-      let data: any = null;
-      try {
-        const text = await res.text();
-        if (text) data = JSON.parse(text);
-      } catch (e) {
-        data = { success: true };
-      }
+      const data = await res.json().catch(() => null);
 
-      if (res.ok && data && data.success !== false) {
-        localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
-        setCurrentBackendPasscode(newPasscode.trim());
+      if (res.ok && data && data.success) {
+        localStorage.setItem('goddess_custom_passcode', cleanNew);
+        setCurrentBackendPasscode(cleanNew);
         setSecuritySuccessMsg('Access passcode verified and saved directly to Supabase database!');
         setCurrentSecurityPasscode('');
         setNewPasscode('');
         setConfirmPasscode('');
-      } else if (data && data.error) {
-        setSecurityErrorMsg(data.error);
       } else {
-        localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
-        setCurrentBackendPasscode(newPasscode.trim());
-        setSecuritySuccessMsg('Access passcode saved!');
-        setCurrentSecurityPasscode('');
-        setNewPasscode('');
-        setConfirmPasscode('');
+        setSecurityErrorMsg(data?.error || 'Security verification failed. Please check your current passcode.');
       }
     } catch (err: any) {
-      localStorage.setItem('goddess_custom_passcode', newPasscode.trim());
-      setCurrentBackendPasscode(newPasscode.trim());
-      setSecuritySuccessMsg('Access passcode saved!');
-      setCurrentSecurityPasscode('');
-      setNewPasscode('');
-      setConfirmPasscode('');
+      setSecurityErrorMsg(err.message || 'Failed to communicate with Supabase database server.');
     }
   };
 

@@ -160,17 +160,15 @@ app.post("/api/admin/passcode", async (req, res) => {
       }
     }
 
-    const isValidCurrent =
-      !currentPasscode ||
-      currentPasscode === storedPasscode ||
-      currentPasscode === "1234" ||
-      currentPasscode === "admin" ||
-      currentPasscode === "LAYLA" ||
-      currentPasscode === "LAYLA2026" ||
-      currentPasscode === "INAYA2026";
+    // Strict validation: Must match the current active passcode stored in Supabase (or "1234" initially)
+    const isValidCurrent = Boolean(
+      currentPasscode &&
+      (currentPasscode === storedPasscode ||
+       (storedPasscode === "1234" && (currentPasscode === "1234" || currentPasscode === "LAYLA")))
+    );
 
     if (!isValidCurrent) {
-      return res.status(401).json({ success: false, error: "Incorrect current passcode. Verification failed." });
+      return res.status(401).json({ success: false, error: "Incorrect current passcode. Security verification failed." });
     }
 
     if (!newPasscode || !newPasscode.trim()) {
