@@ -524,8 +524,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       {/* Main Container */}
       {!isAuthenticated ? (
         /* Full Screen Authentication View */
-        <div className="flex-1 flex items-center justify-center p-6 bg-black">
-          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-8 sm:p-10 space-y-6 text-center shadow-2xl">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-black flex flex-col">
+          <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-6 sm:p-10 space-y-6 text-center shadow-2xl m-auto">
             <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center mx-auto shadow-lg">
               <Lock className="w-7 h-7" />
             </div>
@@ -645,10 +645,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         </div>
       ) : (
         /* Full Screen Authenticated Portal Layout */
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-black text-white">
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden bg-black text-white">
           
           {/* Navigation Sidebar / Top Navigation Bar */}
-          <aside className="w-full md:w-64 bg-neutral-950 border-b md:border-b-0 md:border-r border-neutral-800 shrink-0 p-3 sm:p-4 flex md:flex-col justify-start gap-1.5 overflow-x-auto md:overflow-x-visible">
+          <aside className="w-full md:w-64 bg-neutral-950 border-b md:border-b-0 md:border-r border-neutral-800 shrink-0 p-3 sm:p-4 flex md:flex-col justify-start gap-1.5 overflow-x-auto md:overflow-y-auto md:overflow-x-visible">
             
             <div className="hidden md:block px-3 py-2 mb-2 border-b border-neutral-800">
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-neutral-500 block">
@@ -723,7 +723,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           </aside>
 
           {/* Main Work Area */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-8 md:p-10 max-w-5xl mx-auto w-full space-y-8">
+          <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 md:p-10 max-w-5xl mx-auto w-full space-y-8">
             
             {/* TAB 1: UPLOAD VIDEO & CATALOG MANAGEMENT */}
             {activeTab === 'upload_video' && (
