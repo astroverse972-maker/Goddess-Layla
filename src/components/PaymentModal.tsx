@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Send, ExternalLink, Check, Gift } from 'lucide-react';
 import { SOCIAL_LINKS } from '../data/collectionData';
 
@@ -13,6 +13,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
   const [customAmount, setCustomAmount] = useState<string>('');
   const [message, setMessage] = useState<string>('');
   const [sent, setSent] = useState(false);
+  const [tipfunderUrl, setTipfunderUrl] = useState<string>(SOCIAL_LINKS.tipfunder);
+  const [throneUrl, setThroneUrl] = useState<string>(SOCIAL_LINKS.throne);
+
+  useEffect(() => {
+    fetch('/api/payment-settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.tipfunder) setTipfunderUrl(data.tipfunder);
+          if (data.throne) setThroneUrl(data.throne);
+        }
+      })
+      .catch(() => {});
+
+    try {
+      const savedPay = localStorage.getItem('goddess_payment_settings');
+      if (savedPay) {
+        const parsed = JSON.parse(savedPay);
+        if (parsed.tipfunder) setTipfunderUrl(parsed.tipfunder);
+        if (parsed.throne) setThroneUrl(parsed.throne);
+      }
+    } catch (e) {}
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -22,7 +45,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
     e.preventDefault();
     setSent(true);
     setTimeout(() => {
-      window.open(SOCIAL_LINKS.tipfunder, '_blank');
+      window.open(tipfunderUrl || SOCIAL_LINKS.tipfunder, '_blank');
       setSent(false);
     }, 1000);
   };
@@ -139,7 +162,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
           {/* Quick External Links */}
           <div className="pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs font-bold text-gray-600">
             <a 
-              href={SOCIAL_LINKS.tipfunder} 
+              href={tipfunderUrl} 
               target="_blank" 
               rel="noreferrer"
               className="hover:underline flex items-center gap-1 text-black font-bold"
@@ -149,7 +172,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
             </a>
             <span>•</span>
             <a 
-              href={SOCIAL_LINKS.throne} 
+              href={throneUrl} 
               target="_blank" 
               rel="noreferrer"
               className="hover:underline flex items-center gap-1 text-black font-bold"

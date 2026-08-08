@@ -98,12 +98,26 @@ let liveStreamState = {
 };
 
 // Endpoint to fetch current live status
-app.get("/api/live-status", (_req, res) => {
+app.get("/api/live-status", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "live_status")
+        .maybeSingle();
+
+      if (data && data.value) {
+        liveStreamState = { ...liveStreamState, ...data.value };
+      }
+    } catch (e) {}
+  }
   res.json(liveStreamState);
 });
 
 // Endpoint for Mistress to update Live Status (Go Live / Set Offline)
-app.post("/api/live-status", (req, res) => {
+app.post("/api/live-status", async (req, res) => {
   try {
     const { passcode, isLive, title, description, price, streamUrl } = req.body;
 
@@ -119,6 +133,17 @@ app.post("/api/live-status", (req, res) => {
       streamUrl: streamUrl || liveStreamState.streamUrl,
       updatedAt: Date.now()
     };
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert({
+          key: "live_status",
+          value: liveStreamState,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
 
     return res.json({ 
       success: true, 
@@ -165,6 +190,144 @@ app.post("/api/upload-catbox", async (req, res) => {
 
 // Custom Uploaded Media Collection State
 const customUploadedMedia: any[] = [];
+const softDeletedVideoIds = new Set<string>();
+
+// Global Creator Profile & Payment Settings State (Real-time Backend & Supabase Persistence)
+let creatorProfileState = {
+  name: "Goddess Layla👸🏻",
+  bio: "Welcome to my official VIP sanctuary. Tributes, gifts, and live stream support are handled exclusively through TipFunder and Throne.",
+  gallery: [
+    "https://i.imgur.com/STRpELi.jpg",
+    "https://i.imgur.com/bjTQJK7.jpg",
+    "https://i.imgur.com/tzmLquQ.jpg",
+    "https://i.imgur.com/g5fQwuf.jpg"
+  ]
+};
+
+let paymentSettingsState = {
+  tipfunder: "https://www.tipfunder.com/Geldherrinlay9",
+  throne: "https://throne.com/geldherrinlayla",
+  telegram: "https://t.me/laylathebest",
+  x: "https://x.com/Geldherrinlay9"
+};
+
+// GET /api/creator-profile
+app.get("/api/creator-profile", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "creator_profile")
+        .maybeSingle();
+
+      if (data && data.value) {
+        creatorProfileState = { ...creatorProfileState, ...data.value };
+      }
+    } catch (e) {}
+  }
+  res.json(creatorProfileState);
+});
+
+// POST /api/creator-profile
+app.post("/api/creator-profile", async (req, res) => {
+  try {
+    const { name, bio, gallery } = req.body;
+    creatorProfileState = {
+      name: name || creatorProfileState.name,
+      bio: bio || creatorProfileState.bio,
+      gallery: Array.isArray(gallery) && gallery.length > 0 ? gallery : creatorProfileState.gallery
+    };
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert({
+          key: "creator_profile",
+          value: creatorProfileState,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, profile: creatorProfileState });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/payment-settings
+app.get("/api/payment-settings", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "payment_settings")
+        .maybeSingle();
+
+      if (data && data.value) {
+        paymentSettingsState = { ...paymentSettingsState, ...data.value };
+      }
+    } catch (e) {}
+  }
+  res.json(paymentSettingsState);
+});
+
+// POST /api/payment-settings
+app.post("/api/payment-settings", async (req, res) => {
+  try {
+    const { tipfunder, throne, telegram, x } = req.body;
+    paymentSettingsState = {
+      tipfunder: tipfunder || paymentSettingsState.tipfunder,
+      throne: throne || paymentSettingsState.throne,
+      telegram: telegram || paymentSettingsState.telegram,
+      x: x || paymentSettingsState.x
+    };
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert({
+          key: "payment_settings",
+          value: paymentSettingsState,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, settings: paymentSettingsState });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/custom-media/delete (Soft-delete: hide from public feed, preserve in backend DB)
+app.post("/api/custom-media/delete", async (req, res) => {
+  try {
+    const { videoId } = req.body;
+    if (!videoId) {
+      return res.status(400).json({ error: "videoId is required" });
+    }
+    softDeletedVideoIds.add(String(videoId));
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("soft_deleted_videos").upsert({
+          video_id: String(videoId),
+          deleted_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, hiddenVideoIds: Array.from(softDeletedVideoIds) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 app.get("/api/custom-media", async (_req, res) => {
   const supabase = getSupabaseServerClient();
@@ -172,6 +335,14 @@ app.get("/api/custom-media", async (_req, res) => {
 
   if (supabase) {
     try {
+      // Load soft-deleted videos from Supabase
+      const { data: delData } = await supabase.from("soft_deleted_videos").select("video_id");
+      if (delData && Array.isArray(delData)) {
+        delData.forEach((row) => {
+          if (row.video_id) softDeletedVideoIds.add(String(row.video_id));
+        });
+      }
+
       const { data, error } = await supabase
         .from("content_submissions")
         .select("*")
@@ -210,7 +381,13 @@ app.get("/api/custom-media", async (_req, res) => {
     }
   }
 
-  res.json(media);
+  // Filter out soft-deleted videos for public view
+  const publicMedia = media.filter((item) => !softDeletedVideoIds.has(String(item.id)));
+
+  res.json({
+    media: publicMedia,
+    hiddenVideoIds: Array.from(softDeletedVideoIds)
+  });
 });
 
 app.post("/api/custom-media", async (req, res) => {

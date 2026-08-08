@@ -23,6 +23,15 @@ export function App() {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isMistressAdminOpen, setIsMistressAdminOpen] = useState(false);
 
+  // Hidden/Removed Video IDs State (for soft removal from page)
+  const [hiddenVideoIds, setHiddenVideoIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('goddess_hidden_videos') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
   // Live Stream State from Server
   const [liveState, setLiveState] = useState({
     isLive: false,
@@ -61,6 +70,11 @@ export function App() {
       .then((data) => {
         if (Array.isArray(data)) {
           setCustomMedia(data);
+        } else if (data && Array.isArray(data.media)) {
+          setCustomMedia(data.media);
+          if (Array.isArray(data.hiddenVideoIds)) {
+            setHiddenVideoIds(data.hiddenVideoIds);
+          }
         }
       })
       .catch(() => {});
@@ -94,7 +108,25 @@ export function App() {
     }
   };
 
-  const allCollectionItems = [...customMedia, ...COLLECTION_ITEMS];
+  // Remove video from public page view without backend database deletion
+  const handleDeleteVideo = (videoId: string) => {
+    const updatedHidden = Array.from(new Set([...hiddenVideoIds, videoId]));
+    setHiddenVideoIds(updatedHidden);
+    try {
+      localStorage.setItem('goddess_hidden_videos', JSON.stringify(updatedHidden));
+    } catch (e) {}
+
+    // Send soft-delete signal to server so video is hidden for all visitors
+    fetch('/api/custom-media/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoId }),
+    }).catch(() => {});
+  };
+
+  // Filter out any hidden videos from public display
+  const rawCollection = [...customMedia, ...COLLECTION_ITEMS];
+  const allCollectionItems = rawCollection.filter((item) => !hiddenVideoIds.includes(item.id));
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-gray-900 selection:text-white">
@@ -131,7 +163,7 @@ export function App() {
         {/* Tribute Section */}
         <TributeSection lang={lang} />
 
-        {/* Boss Inaya Bio & Slideshow Section */}
+        {/* Boss Layla Bio & Slideshow Section */}
         <AboutBio lang={lang} />
 
       </main>
@@ -179,6 +211,8 @@ export function App() {
         currentLiveState={liveState}
         onUpdateLiveState={(newState) => setLiveState(newState)}
         onUploadMediaSuccess={fetchServerState}
+        publishedVideos={allCollectionItems}
+        onDeleteVideo={handleDeleteVideo}
       />
 
     </div>
@@ -186,4 +220,3 @@ export function App() {
 }
 
 export default App;
-
