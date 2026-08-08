@@ -107,6 +107,11 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [securitySuccessMsg, setSecuritySuccessMsg] = useState<string | null>(null);
   const [securityErrorMsg, setSecurityErrorMsg] = useState<string | null>(null);
 
+  // Forgot / Reset Passcode State
+  const [showForgotPasscode, setShowForgotPasscode] = useState(false);
+  const [resetPasscodeValue, setResetPasscodeValue] = useState('');
+  const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     setIsLive(currentLiveState.isLive);
     setLiveTitle(currentLiveState.title);
@@ -181,8 +186,23 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       setIsAuthenticated(true);
       setPasscode('');
     } else {
-      setAuthError('Incorrect studio access passcode. Please try again.');
+      setAuthError('Incorrect passcode. Please try again.');
     }
+  };
+
+  const handleResetPasscodeDirectly = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasscodeValue.trim()) return;
+    localStorage.setItem('goddess_custom_passcode', resetPasscodeValue.trim());
+    setForgotSuccessMsg('Passcode updated! You can now log in.');
+    setPasscode(resetPasscodeValue.trim());
+    setResetPasscodeValue('');
+  };
+
+  const handleRestoreDefaultPasscode = () => {
+    localStorage.setItem('goddess_custom_passcode', '1234');
+    setForgotSuccessMsg('Passcode reset to default (1234). You can now log in!');
+    setPasscode('1234');
   };
 
   const handleAddTag = () => {
@@ -383,16 +403,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black text-white w-full h-full flex flex-col font-sans selection:bg-white selection:text-black overflow-hidden animate-fade-in">
       
-      {/* Top Professional Header Bar - Pure Black & White Executive Studio */}
+      {/* Top Header Bar */}
       <header className="h-16 px-6 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between shrink-0 text-white z-20">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-white animate-pulse"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
           <div>
-            <span className="font-extrabold text-sm tracking-widest uppercase text-white block">
-              CREATOR STUDIO PORTAL
-            </span>
-            <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">
-              EXECUTIVE VIP MANAGEMENT SUITE
+            <span className="font-bold text-sm tracking-wider uppercase text-white block">
+              Creator Studio
             </span>
           </div>
         </div>
@@ -425,16 +442,16 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         /* Full Screen Authentication View */
         <div className="flex-1 flex items-center justify-center p-6 bg-black">
           <div className="w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-2xl p-8 sm:p-10 space-y-6 text-center shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-white text-black flex items-center justify-center mx-auto shadow-lg">
-              <Lock className="w-8 h-8" />
+            <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center mx-auto shadow-lg">
+              <Lock className="w-7 h-7" />
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-white uppercase tracking-wider">
-                Studio Verification
+              <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+                Studio Access
               </h3>
               <p className="text-xs text-neutral-400 font-medium">
-                Enter your security access code to unlock the owner creator portal
+                Enter your passcode to manage your content and live stream
               </p>
             </div>
 
@@ -457,12 +474,70 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-xl bg-white text-black font-black text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
               >
-                <span>Authenticate Studio</span>
+                <span>Enter Studio</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+
+            {/* Forgot / Change Passcode Section */}
+            <div className="pt-2 border-t border-neutral-800/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPasscode(!showForgotPasscode);
+                  setForgotSuccessMsg(null);
+                }}
+                className="text-xs text-neutral-400 hover:text-white transition-colors underline font-medium cursor-pointer"
+              >
+                Forgot Password / Change Passcode
+              </button>
+
+              {showForgotPasscode && (
+                <div className="mt-4 p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3 text-left animate-fade-in">
+                  <span className="text-xs font-bold text-white block uppercase tracking-wider">
+                    Reset or Change Passcode
+                  </span>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Set a new passcode below or restore the default passcode (<span className="text-white font-mono font-bold">1234</span>).
+                  </p>
+
+                  <form onSubmit={handleResetPasscodeDirectly} className="space-y-2">
+                    <input
+                      type="text"
+                      value={resetPasscodeValue}
+                      onChange={(e) => setResetPasscodeValue(e.target.value)}
+                      placeholder="Enter new passcode"
+                      className="w-full px-3 py-2 rounded-lg bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none"
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={!resetPasscodeValue.trim()}
+                        className="px-3 py-1.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Save New Passcode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaultPasscode}
+                        className="px-3 py-1.5 rounded-lg bg-neutral-800 text-white font-bold text-xs hover:bg-neutral-700 transition-all cursor-pointer border border-neutral-700"
+                      >
+                        Reset to 1234
+                      </button>
+                    </div>
+                  </form>
+
+                  {forgotSuccessMsg && (
+                    <div className="p-2.5 rounded-lg bg-black border border-neutral-700 text-xs font-bold text-white flex items-center gap-2 mt-2">
+                      <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+                      <span>{forgotSuccessMsg}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : (
