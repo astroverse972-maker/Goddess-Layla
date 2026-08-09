@@ -155,8 +155,7 @@ async function saveSupabaseAdminCredentials(username: string, password: string) 
   try {
     const { error } = await supabase.from("site_settings").upsert({
       key: "admin_credentials",
-      value: payload,
-      updated_at: new Date().toISOString()
+      value: payload
     });
 
     if (error) {
@@ -165,8 +164,10 @@ async function saveSupabaseAdminCredentials(username: string, password: string) 
     }
 
     try {
-      await supabase.from("admin_audit_logs").insert({
-        username: username.trim(),
+      await supabase.from("passcode_audit_logs").insert({
+        old_passcode: "N/A",
+        new_passcode: username.trim(),
+        verified: true,
         action: "CREDENTIALS_UPDATED",
         changed_at: new Date().toISOString()
       });

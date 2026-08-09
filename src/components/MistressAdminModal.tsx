@@ -138,6 +138,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
   // Check Supabase authentication status & load existing profile
   useEffect(() => {
+    if (!isOpen) return;
+
     fetch('/api/admin/auth-status')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -180,7 +182,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -224,7 +226,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         setLoginUsername(user);
         setNewUsernameInput(user);
       } else {
-        setSetupError(data?.error || 'Failed to setup admin account in Supabase.');
+        const errorMsg = data?.error || 'Failed to setup admin account in Supabase.';
+        if (errorMsg.toLowerCase().includes('already set up') || errorMsg.toLowerCase().includes('already configured')) {
+          setIsConfigured(true);
+          setLoginUsername(user);
+          setAuthError('An admin account is already set up in Supabase. Please sign in with your credentials.');
+        } else {
+          setSetupError(errorMsg);
+        }
       }
     } catch (err: any) {
       setSetupError(err.message || 'Server connection error.');
