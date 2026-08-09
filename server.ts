@@ -212,6 +212,7 @@ app.get("/api/admin/auth-status", async (req, res) => {
 
 // POST /api/admin/setup - Initial first-time admin setup in Supabase
 app.post("/api/admin/setup", async (req, res) => {
+  console.log(">>> POST /api/admin/setup HANDLER HIT <<<");
   res.setHeader("Content-Type", "application/json");
   try {
     const { username, password } = req.body || {};

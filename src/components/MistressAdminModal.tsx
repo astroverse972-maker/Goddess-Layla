@@ -135,7 +135,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    fetch('/api/admin/auth-status')
+    fetch('/api/admin/auth-status', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
@@ -210,6 +210,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       const res = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username: user, password: pass })
       });
 
@@ -254,6 +255,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username: user, password: pass })
       });
 
@@ -274,7 +276,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/admin/logout', { method: 'POST' });
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     } catch (e) {}
     setIsAuthenticated(false);
   };
