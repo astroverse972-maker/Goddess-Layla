@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import { getSupabaseServerClient } from "./src/lib/supabaseServer";
 
@@ -153,9 +154,11 @@ async function saveSupabaseAdminCredentials(username: string, password: string) 
   if (!supabase) {
     return { success: false, error: "Supabase client not initialized. Check database connection." };
   }
+  const isAlreadyHashed = password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$");
+  const hashedPassword = isAlreadyHashed ? password : bcrypt.hashSync(password.trim(), 10);
   const payload = {
     username: username.trim(),
-    password: password.trim(),
+    password: hashedPassword,
     updated_at: new Date().toISOString()
   };
   try {
@@ -226,7 +229,11 @@ app.post("/api/admin/setup", async (req, res) => {
     }
 
     const supabase = getSupabaseServerClient();
-    const payload = { username: username.trim(), password: password.trim(), updated_at: new Date().toISOString() };
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: "Supabase client not initialized. Check database environment variables." });
+    }
+    const hashedPassword = bcrypt.hashSync(password.trim(), 10);
+    const payload = { username: username.trim(), password: hashedPassword, updated_at: new Date().toISOString() };
 
     // Safe database write handling
     let writeError: any = null;
@@ -294,7 +301,13 @@ app.post("/api/admin/login", async (req, res) => {
     const cleanPass = String(password || "").trim();
 
     const isUserValid = cleanUser.toLowerCase() === creds.username.toLowerCase();
-    const isPassValid = cleanPass === creds.password;
+    
+    let isPassValid = false;
+    if (creds.password.startsWith("$2a$") || creds.password.startsWith("$2b$") || creds.password.startsWith("$2y$")) {
+      isPassValid = bcrypt.compareSync(cleanPass, creds.password);
+    } else {
+      isPassValid = (cleanPass === creds.password);
+    }
 
     if (!isUserValid || !isPassValid) {
       return res.status(401).json({
@@ -343,7 +356,14 @@ app.post("/api/admin/change-credentials", async (req, res) => {
     }
 
     const cleanCurrent = String(currentPassword || "").trim();
-    if (cleanCurrent !== creds.password) {
+    let isCurrentValid = false;
+    if (creds.password.startsWith("$2a$") || creds.password.startsWith("$2b$") || creds.password.startsWith("$2y$")) {
+      isCurrentValid = bcrypt.compareSync(cleanCurrent, creds.password);
+    } else {
+      isCurrentValid = (cleanCurrent === creds.password);
+    }
+
+    if (!isCurrentValid) {
       return res.status(401).json({
         success: false,
         error: "Incorrect current password. Security verification failed."
@@ -351,13 +371,17 @@ app.post("/api/admin/change-credentials", async (req, res) => {
     }
 
     const targetUsername = (newUsername && newUsername.trim()) ? newUsername.trim() : creds.username;
-    const targetPassword = (newPassword && newPassword.trim()) ? newPassword.trim() : creds.password;
+    let targetPassword = creds.password; // Keep existing hash if no new password
+
+    if (newPassword && newPassword.trim()) {
+      if (newPassword.trim().length < 3) {
+        return res.status(400).json({ success: false, error: "New password must be at least 3 characters." });
+      }
+      targetPassword = bcrypt.hashSync(newPassword.trim(), 10);
+    }
 
     if (targetUsername.length < 3) {
       return res.status(400).json({ success: false, error: "Username must be at least 3 characters." });
-    }
-    if (targetPassword.length < 3) {
-      return res.status(400).json({ success: false, error: "New password must be at least 3 characters." });
     }
 
     await saveSupabaseAdminCredentials(targetUsername, targetPassword);
