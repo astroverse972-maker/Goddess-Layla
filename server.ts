@@ -15,7 +15,7 @@ app.use(express.urlencoded({ limit: "1000mb", extended: true }));
 
 // Global Request Logger
 app.use((req, _res, next) => {
-  console.log(`[REQ] ${req.method} ${req.url}`);
+  console.log(`[EXPRESS REQ] ${req.method} ${req.url}`);
   next();
 });
 
@@ -207,7 +207,7 @@ app.get("/api/admin/auth-status", async (req, res) => {
   const creds = await getSupabaseAdminCredentials();
   const cookies = parseCookies(req);
   const sessionToken = cookies["admin_session"];
-  const isAuthenticated = Boolean(sessionToken && sessionToken.startsWith("admin_session_"));
+  const isAuthenticated = Boolean(sessionToken && (sessionToken.startsWith("admin_session_") || sessionToken.startsWith("session_")));
 
   res.json({
     isConfigured: Boolean(creds && creds.username && creds.password),
@@ -218,60 +218,34 @@ app.get("/api/admin/auth-status", async (req, res) => {
 
 // POST /api/admin/setup - Initial first-time admin setup in Supabase
 app.post("/api/admin/setup", async (req, res) => {
-  console.log(">>> POST /api/admin/setup HANDLER HIT <<<");
-  res.setHeader("Content-Type", "application/json");
+  console.log("[SETUP ENDPOINT] Request received body:", req.body);
   try {
     const { username, password } = req.body || {};
-    const creds = await getSupabaseAdminCredentials();
-    if (creds && creds.username && creds.password) {
-      return res.status(400).json({
-        success: false,
-        error: "An admin account is already set up in Supabase. Please log in."
-      });
+    if (!username || username.trim().length < 3 || !password || password.trim().length < 3) {
+      return res.status(400).json({ success: false, error: "Username and password must be at least 3 characters long." });
     }
 
-    if (!username || !username.trim() || username.trim().length < 3) {
-      return res.status(400).json({
-        success: false,
-        error: "Username must be at least 3 characters long."
-      });
+    const supabase = getSupabaseServerClient();
+    const payload = { username: username.trim(), password: password.trim(), updated_at: new Date().toISOString() };
+
+    const { data, error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "admin_credentials", value: payload }, { onConflict: "key" })
+      .select();
+
+    if (error) {
+      console.error("[SUPABASE WRITE ERROR]:", error);
+      return res.status(500).json({ success: false, error: `Database Error: ${error.message}` });
     }
 
-    if (!password || !password.trim() || password.trim().length < 3) {
-      return res.status(400).json({
-        success: false,
-        error: "Password must be at least 3 characters long."
-      });
-    }
-
-    const cleanUsername = username.trim();
-    const cleanPassword = password.trim();
-
-    const saveResult = await saveSupabaseAdminCredentials(cleanUsername, cleanPassword);
-
-    if (!saveResult.success) {
-      return res.status(500).json({
-        success: false,
-        error: saveResult.error
-      });
-    }
-
-    const token = `admin_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    res.cookie("admin_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 24 * 60 * 60 * 1000,
-      path: "/"
-    });
-
-    return res.json({
-      success: true,
-      message: "Admin account successfully created and saved in Supabase database!",
-      username: cleanUsername
-    });
+    console.log("[SUPABASE WRITE SUCCESS]:", data);
+    
+    // Set HTTP-Only Cookie
+    res.cookie('admin_session', `session_${Date.now()}`, { httpOnly: true, sameSite: 'strict', secure: false, path: '/' });
+    return res.json({ success: true, message: "Admin account configured successfully!" });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message || "Failed to set up admin account." });
+    console.error("[SETUP CRASH]:", err);
+    return res.status(500).json({ success: false, error: err.message || "Server exception during setup." });
   }
 });
 
