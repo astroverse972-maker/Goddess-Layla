@@ -13,6 +13,12 @@ const PORT = 3000;
 app.use(express.json({ limit: "1000mb" }));
 app.use(express.urlencoded({ limit: "1000mb", extended: true }));
 
+// Global Request Logger
+app.use((req, _res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  next();
+});
+
 // Lazy Gemini API client initialization
 let genaiClient: GoogleGenAI | null = null;
 function getGenAI() {
@@ -969,6 +975,23 @@ app.get("/api/health", (_req, res) => {
 });
 
 async function startServer() {
+  // Test Supabase connection on startup
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    console.log("[SUPABASE ERROR] Supabase client not initialized.");
+  } else {
+    try {
+      const { data, error } = await supabase.from("site_settings").select("key").limit(1);
+      if (error) {
+        console.log(`[SUPABASE ERROR] ${error.message}`);
+      } else {
+        console.log(`[SUPABASE SUCCESS] Connected to Supabase site_settings table. Found ${data ? data.length : 0} rows.`);
+      }
+    } catch (err: any) {
+      console.log(`[SUPABASE ERROR] ${err.message || err}`);
+    }
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
