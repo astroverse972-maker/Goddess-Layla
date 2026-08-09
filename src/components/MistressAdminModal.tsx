@@ -226,7 +226,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         if (errorMsg.toLowerCase().includes('already set up') || errorMsg.toLowerCase().includes('already configured')) {
           setIsConfigured(true);
           setLoginUsername(user);
-          setAuthError(data?.error || 'An admin account is already set up in Supabase. Please sign in with your chosen credentials.');
+          setAuthError(data?.error || 'An admin account is already set up. Please sign in with your chosen credentials.');
         } else {
           setSetupError(errorMsg);
         }
@@ -265,7 +265,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         setIsAuthenticated(true);
         setLoginPassword('');
       } else {
-        setAuthError(data?.error || 'Invalid username or password. Security verification failed against Supabase database.');
+        setAuthError(data?.error || 'Invalid username or password. Security verification failed.');
       }
     } catch (err: any) {
       setAuthError(err.message || 'Server authentication error.');
@@ -369,7 +369,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       }
 
       if (res.ok && resData && resData.success) {
-        setPostSuccessMsg('Video published and saved directly to Supabase database! Content is live.');
+        setPostSuccessMsg('Video published successfully! Content is live.');
       } else {
         setPostSuccessMsg('Thank you, Video will appear in page after verification');
       }
@@ -514,7 +514,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.success) {
-        setSecuritySuccessMsg(`Credentials updated and saved in Supabase database successfully! Username: "${data.username}".`);
+        setSecuritySuccessMsg(`Credentials updated successfully! Username: "${data.username}".`);
         setCurrentSecurityPassword('');
         setNewPasswordInput('');
         setConfirmNewPasswordInput('');
@@ -523,10 +523,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           setNewUsernameInput(data.username);
         }
       } else {
-        setSecurityErrorMsg(data?.error || 'Failed to update credentials in Supabase database.');
+        setSecurityErrorMsg(data?.error || 'Failed to update credentials.');
       }
     } catch (err: any) {
-      setSecurityErrorMsg(err.message || 'Failed to communicate with Supabase database server.');
+      setSecurityErrorMsg(err.message || 'Failed to communicate with database server.');
     }
   };
 
@@ -596,7 +596,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     First-Time Admin Setup
                   </h3>
                   <p className="text-xs text-neutral-400 font-medium">
-                    Choose your official username and password. Saved directly to Supabase.
+                    Choose your official username and password.
                   </p>
                 </div>
 
@@ -626,7 +626,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={setupPassword}
                       onChange={(e) => setSetupPassword(e.target.value)}
                       placeholder="Create secure password"
-                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-sans"
                     />
                   </div>
 
@@ -640,7 +640,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={confirmSetupPassword}
                       onChange={(e) => setConfirmSetupPassword(e.target.value)}
                       placeholder="Re-enter password"
-                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-sans"
                     />
                   </div>
 
@@ -656,7 +656,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     disabled={isSettingUp}
                     className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <span>{isSettingUp ? 'Saving to Supabase...' : 'Create Account & Enter Studio'}</span>
+                    <span>{isSettingUp ? 'Saving Credentials...' : 'Create Account & Enter Studio'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
@@ -699,7 +699,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="Password"
-                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                      className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-white font-bold text-sm focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-sans"
                     />
                   </div>
 
@@ -728,7 +728,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     disabled={isLoggingIn}
                     className="w-full py-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <span>{isLoggingIn ? 'Verifying with Supabase...' : 'Enter Creator Studio'}</span>
+                    <span>{isLoggingIn ? 'Verifying Credentials...' : 'Enter Creator Studio'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
@@ -985,7 +985,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         Published Video Catalog
                       </h3>
                       <p className="text-xs text-neutral-400">
-                        Remove videos from your public feed anytime (Soft Delete: preserved safely in backend)
+                        Remove videos from your public feed anytime (Soft Delete: preserved safely in storage)
                       </p>
                     </div>
                   </div>
@@ -1346,10 +1346,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 <div className="border-b border-neutral-800 pb-4">
                   <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider flex items-center gap-2">
                     <Key className="w-6 h-6 text-white" />
-                    <span>Studio Security & Supabase Account</span>
+                    <span>Studio Security & Admin Account</span>
                   </h2>
                   <p className="text-xs text-neutral-400 mt-1">
-                    Update your admin username or password anytime (saved directly to Supabase)
+                    Update your admin username or password anytime
                   </p>
                 </div>
 
@@ -1365,7 +1365,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={currentSecurityPassword}
                       onChange={(e) => setCurrentSecurityPassword(e.target.value)}
                       placeholder="Type current password to authorize changes"
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                     />
                   </div>
 
@@ -1378,7 +1378,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={newUsernameInput}
                       onChange={(e) => setNewUsernameInput(e.target.value)}
                       placeholder="Admin username"
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                     />
                   </div>
 
@@ -1391,7 +1391,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={newPasswordInput}
                       onChange={(e) => setNewPasswordInput(e.target.value)}
                       placeholder="Leave blank if keeping current password"
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                     />
                   </div>
 
@@ -1404,7 +1404,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={confirmNewPasswordInput}
                       onChange={(e) => setConfirmNewPasswordInput(e.target.value)}
                       placeholder="Confirm new password"
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                     />
                   </div>
 
@@ -1426,7 +1426,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     type="submit"
                     className="w-full py-4 rounded-xl bg-white text-black font-black text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all cursor-pointer shadow-lg"
                   >
-                    Save Credentials to Supabase
+                    Save Credentials
                   </button>
                 </div>
               </form>
