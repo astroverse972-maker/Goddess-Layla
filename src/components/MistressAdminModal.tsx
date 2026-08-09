@@ -53,12 +53,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 }) => {
   // Real Supabase Admin Authentication State
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return Boolean(
-      localStorage.getItem('goddess_admin_session') ||
-      sessionStorage.getItem('goddess_admin_session')
-    );
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   // Login Form State
   const [loginUsername, setLoginUsername] = useState('');
@@ -145,6 +140,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       .then((data) => {
         if (data) {
           setIsConfigured(Boolean(data.isConfigured));
+          if (data.isAuthenticated) {
+            setIsAuthenticated(true);
+          }
           if (data.username) {
             setLoginUsername(data.username);
             setNewUsernameInput(data.username);
@@ -220,17 +218,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       if (res.ok && data && data.success) {
         setIsConfigured(true);
         setIsAuthenticated(true);
-        const token = `admin_session_${Date.now()}`;
-        localStorage.setItem('goddess_admin_session', JSON.stringify({ username: user, token }));
-        localStorage.setItem('goddess_admin_username', user);
         setLoginUsername(user);
         setNewUsernameInput(user);
       } else {
-        const errorMsg = data?.error || 'Failed to setup admin account in Supabase.';
+        const errorMsg = data?.error || `Server error (${res.status || 'unknown'})`;
         if (errorMsg.toLowerCase().includes('already set up') || errorMsg.toLowerCase().includes('already configured')) {
           setIsConfigured(true);
           setLoginUsername(user);
-          setAuthError('An admin account is already set up in Supabase. Please sign in with your credentials.');
+          setAuthError(data?.error || 'An admin account is already set up in Supabase. Please sign in with your chosen credentials.');
         } else {
           setSetupError(errorMsg);
         }
@@ -259,20 +254,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass, rememberMe })
+        body: JSON.stringify({ username: user, password: pass })
       });
 
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.success) {
         setIsAuthenticated(true);
-        const sessionData = { username: data.username, token: data.token };
-        if (rememberMe) {
-          localStorage.setItem('goddess_admin_session', JSON.stringify(sessionData));
-        } else {
-          sessionStorage.setItem('goddess_admin_session', JSON.stringify(sessionData));
-        }
-        localStorage.setItem('goddess_admin_username', data.username);
         setLoginPassword('');
       } else {
         setAuthError(data?.error || 'Invalid username or password. Security verification failed against Supabase database.');
@@ -282,6 +270,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     } finally {
       setIsLoggingIn(false);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' });
+    } catch (e) {}
+    setIsAuthenticated(false);
   };
 
 
@@ -524,7 +519,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         if (data.username) {
           setLoginUsername(data.username);
           setNewUsernameInput(data.username);
-          localStorage.setItem('goddess_admin_username', data.username);
         }
       } else {
         setSecurityErrorMsg(data?.error || 'Failed to update credentials in Supabase database.');
@@ -561,14 +555,26 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           </div>
         )}
 
-        <button
-          onClick={onClose}
-          className="px-4 py-2 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer flex items-center gap-2 shadow-sm"
-          aria-label="Exit Studio"
-        >
-          <span>Exit Studio</span>
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 font-bold text-xs uppercase tracking-wider hover:bg-neutral-800 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          )}
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer flex items-center gap-2 shadow-sm"
+            aria-label="Exit Studio"
+          >
+            <span>Exit Studio</span>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </header>
 
       {/* Main Container */}

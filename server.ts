@@ -180,12 +180,33 @@ async function saveSupabaseAdminCredentials(username: string, password: string) 
   }
 }
 
-// GET /api/admin/auth-status - Check if admin credentials are configured in Supabase
-app.get("/api/admin/auth-status", async (_req, res) => {
+// Helper to parse cookies from request headers
+function parseCookies(req: express.Request): Record<string, string> {
+  const list: Record<string, string> = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(";").forEach((cookie) => {
+      const parts = cookie.split("=");
+      const name = parts.shift()?.trim();
+      if (name) {
+        list[name] = decodeURIComponent(parts.join("=").trim());
+      }
+    });
+  }
+  return list;
+}
+
+// GET /api/admin/auth-status - Check if admin credentials are configured in Supabase & check session cookie
+app.get("/api/admin/auth-status", async (req, res) => {
   const creds = await getSupabaseAdminCredentials();
+  const cookies = parseCookies(req);
+  const sessionToken = cookies["admin_session"];
+  const isAuthenticated = Boolean(sessionToken && sessionToken.startsWith("admin_session_"));
+
   res.json({
     isConfigured: Boolean(creds && creds.username && creds.password),
-    username: creds ? creds.username : null
+    username: creds ? creds.username : null,
+    isAuthenticated
   });
 });
 
@@ -224,9 +245,18 @@ app.post("/api/admin/setup", async (req, res) => {
     if (!saveResult.success) {
       return res.status(500).json({
         success: false,
-        error: `Supabase Error: ${saveResult.error}`
+        error: saveResult.error
       });
     }
+
+    const token = `admin_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    res.cookie("admin_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+      path: "/"
+    });
 
     return res.json({
       success: true,
@@ -242,7 +272,7 @@ app.post("/api/admin/setup", async (req, res) => {
 app.post("/api/admin/login", async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   try {
-    const { username, password, rememberMe } = req.body || {};
+    const { username, password } = req.body || {};
     const creds = await getSupabaseAdminCredentials();
 
     if (!creds || !creds.username || !creds.password) {
@@ -266,17 +296,28 @@ app.post("/api/admin/login", async (req, res) => {
     }
 
     const token = `admin_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    res.cookie("admin_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+      path: "/"
+    });
 
     return res.json({
       success: true,
       message: "Authentication successful!",
-      username: creds.username,
-      token,
-      rememberMe: Boolean(rememberMe)
+      username: creds.username
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message || "Login failed due to server error." });
   }
+});
+
+// POST /api/admin/logout - Clear HTTP-only session cookie
+app.post("/api/admin/logout", (_req, res) => {
+  res.clearCookie("admin_session", { path: "/" });
+  res.json({ success: true, message: "Logged out successfully" });
 });
 
 // POST /api/admin/change-credentials - Change username/password with current password check
