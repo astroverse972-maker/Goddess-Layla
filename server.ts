@@ -228,17 +228,44 @@ app.post("/api/admin/setup", async (req, res) => {
     const supabase = getSupabaseServerClient();
     const payload = { username: username.trim(), password: password.trim(), updated_at: new Date().toISOString() };
 
-    const { data, error } = await supabase
+    // Safe database write handling
+    let writeError: any = null;
+    let writeData: any = null;
+
+    const upsertRes = await supabase
       .from("site_settings")
-      .upsert({ key: "admin_credentials", value: payload }, { onConflict: "key" })
+      .upsert({ key: "admin_credentials", value: payload, updated_at: new Date().toISOString() }, { onConflict: "key" })
       .select();
 
-    if (error) {
-      console.error("[SUPABASE WRITE ERROR]:", error);
-      return res.status(500).json({ success: false, error: `Database Error: ${error.message}` });
+    if (upsertRes.error) {
+      console.warn("[UPSERT FAILED, USING SELECT+UPDATE/INSERT FALLBACK]:", upsertRes.error.message);
+      const { data: existing } = await supabase.from("site_settings").select("id").eq("key", "admin_credentials").maybeSingle();
+      if (existing) {
+        const updateRes = await supabase
+          .from("site_settings")
+          .update({ value: payload, updated_at: new Date().toISOString() })
+          .eq("key", "admin_credentials")
+          .select();
+        writeError = updateRes.error;
+        writeData = updateRes.data;
+      } else {
+        const insertRes = await supabase
+          .from("site_settings")
+          .insert({ key: "admin_credentials", value: payload, updated_at: new Date().toISOString() })
+          .select();
+        writeError = insertRes.error;
+        writeData = insertRes.data;
+      }
+    } else {
+      writeData = upsertRes.data;
     }
 
-    console.log("[SUPABASE WRITE SUCCESS]:", data);
+    if (writeError) {
+      console.error("[SUPABASE WRITE ERROR]:", writeError);
+      return res.status(500).json({ success: false, error: `Database Error: ${writeError.message}` });
+    }
+
+    console.log("[SUPABASE WRITE SUCCESS]:", writeData);
     
     // Set HTTP-Only Cookie
     res.cookie('admin_session', `session_${Date.now()}`, { httpOnly: true, sameSite: 'strict', secure: false, path: '/' });
