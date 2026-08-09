@@ -1,6 +1,6 @@
 import React from 'react';
 import { SOCIAL_LINKS } from '../data/collectionData';
-import { Send, Gift } from 'lucide-react';
+import { Send, Gift, Crown } from 'lucide-react';
 
 interface FooterProps {
   lang?: 'fr' | 'en';
@@ -8,6 +8,15 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
+  const handlePortalClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onOpenAdmin) {
+      onOpenAdmin();
+    } else {
+      window.location.hash = '#admin';
+    }
+  };
+
   return (
     <footer className="bg-white border-t border-gray-200/80 py-12 px-4 sm:px-6 lg:px-8 mt-12 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -80,10 +89,21 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
           <div className="select-none cursor-default">
             © {new Date().getFullYear()} Goddess Layla. All rights reserved. VIP Space 18+.
           </div>
+
+          {/* Goddess Layla Portal Link */}
+          <a
+            href="/admin"
+            onClick={handlePortalClick}
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 hover:text-black transition-all py-1 px-3 rounded-full border border-gray-200 hover:border-black bg-white hover:bg-gray-50 shadow-2xs cursor-pointer group"
+            title="Goddess Layla Sanctuary Portal"
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+            <span>Goddess Layla Portal</span>
+          </a>
         </div>
 
       </div>

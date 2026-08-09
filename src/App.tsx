@@ -84,10 +84,11 @@ export function App() {
     fetchServerState();
     const interval = setInterval(fetchServerState, 5000); // sync every 5 seconds
 
-    // Check if URL indicates admin portal request strictly via #admin
+    // Check if URL indicates admin portal request strictly via #admin or /admin
     const checkAdminRoute = () => {
       const hash = window.location.hash.toLowerCase();
-      if (hash === '#admin') {
+      const path = window.location.pathname.toLowerCase();
+      if (hash === '#admin' || path.endsWith('/admin')) {
         setIsMistressAdminOpen(true);
       }
     };
@@ -169,7 +170,7 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <Footer lang={lang} />
+      <Footer lang={lang} onOpenAdmin={() => setIsMistressAdminOpen(true)} />
 
       {/* Modals */}
       <MediaModal

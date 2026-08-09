@@ -20,7 +20,8 @@ import {
   ArrowRight,
   Eye,
   ShieldCheck,
-  Settings
+  Settings,
+  Crown
 } from 'lucide-react';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { CollectionItem } from '../data/collectionData';
@@ -536,10 +537,11 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       {/* Top Header Bar */}
       <header className="h-16 px-6 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between shrink-0 text-white z-20">
         <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
           <div>
-            <span className="font-bold text-sm tracking-wider uppercase text-white block">
-              Creator Studio
+            <span className="font-bold text-sm tracking-wider uppercase text-white flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>{isAuthenticated ? 'Welcome back, Goddess Layla' : 'Goddess Layla Portal'}</span>
             </span>
           </div>
         </div>
@@ -817,6 +819,25 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
           {/* Main Work Area */}
           <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 md:p-10 max-w-5xl mx-auto w-full space-y-8">
+            
+            {/* Personalized Welcome Banner */}
+            <div className="bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <Crown className="w-5 h-5 text-amber-400 shrink-0" />
+                  <h1 className="text-xl sm:text-2xl font-serif font-bold text-white tracking-wide">
+                    Welcome back, Goddess Layla
+                  </h1>
+                </div>
+                <p className="text-xs text-neutral-400 font-medium">
+                  Your private sanctuary portal. Manage your video catalog, live broadcasts, and security settings.
+                </p>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-neutral-900 border border-neutral-700 text-[11px] text-amber-200 font-semibold tracking-wide flex items-center gap-2 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Private Sanctuary Active</span>
+              </div>
+            </div>
             
             {/* TAB 1: UPLOAD VIDEO & CATALOG MANAGEMENT */}
             {activeTab === 'upload_video' && (
