@@ -548,11 +548,11 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           <div className="hidden md:flex items-center gap-4 text-xs">
             <div className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-800 flex items-center gap-2">
               <Film className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="text-neutral-300 font-mono">{publishedVideos.length} Catalog Items</span>
+              <span className="text-neutral-300 font-sans font-medium">{publishedVideos.length} Catalog Items</span>
             </div>
             <div className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-800 flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-white animate-ping' : 'bg-neutral-600'}`}></span>
-              <span className="text-neutral-300 font-mono">{isLive ? 'LIVE ONLINE' : 'STREAM OFFLINE'}</span>
+              <span className="text-neutral-300 font-sans font-medium">{isLive ? 'LIVE ONLINE' : 'STREAM OFFLINE'}</span>
             </div>
           </div>
         )}
@@ -744,7 +744,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           <aside className="w-full md:w-64 bg-neutral-950 border-b md:border-b-0 md:border-r border-neutral-800 shrink-0 p-3 sm:p-4 flex md:flex-col justify-start gap-1.5 overflow-x-auto md:overflow-y-auto md:overflow-x-visible">
             
             <div className="hidden md:block px-3 py-2 mb-2 border-b border-neutral-800">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-neutral-500 block">
+              <span className="text-[10px] font-sans font-bold uppercase tracking-widest text-neutral-500 block">
                 Studio Management
               </span>
             </div>
@@ -850,7 +850,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={driveLink}
                       onChange={(e) => setDriveLink(e.target.value)}
                       placeholder="https://drive.google.com/file/d/..."
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all placeholder-neutral-600 font-sans"
                     />
                     <p className="text-[11px] text-neutral-500 mt-1.5">
                       Ensure your link access is set to <span className="text-neutral-300 font-bold">"Anyone with the link can view"</span>.
@@ -869,7 +869,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={videoTitle}
                         onChange={(e) => setVideoTitle(e.target.value)}
                         placeholder="e.g. VIP Private Domination Session"
-                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all"
+                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                       />
                     </div>
 
@@ -883,7 +883,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={videoPrice}
                         onChange={(e) => setVideoPrice(e.target.value)}
                         placeholder="25.00"
-                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                       />
                     </div>
                   </div>
@@ -925,7 +925,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           value={thumbnailUrl}
                           onChange={(e) => setThumbnailUrl(e.target.value)}
                           placeholder="https://i.imgur.com/your-image.jpg"
-                          className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all font-mono"
+                          className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all font-sans"
                         />
                       </div>
                     )}
@@ -997,29 +997,42 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {publishedVideos.map((video) => (
-                        <div key={video.id} className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center gap-4 group hover:border-neutral-700 transition-all">
-                          <img 
-                            src={video.image} 
-                            alt={video.title} 
-                            className="w-16 h-16 rounded-xl object-cover shrink-0 bg-neutral-900"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-bold text-white truncate uppercase">{video.title}</h4>
-                            <p className="text-[11px] text-neutral-400 font-mono mt-0.5">${video.price}</p>
-                            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-400 font-mono">
-                              {video.category || 'Exclusive'}
-                            </span>
+                      {publishedVideos.map((video) => {
+                        const thumbSrc = video.thumbnailUrl || (video as any).thumbnail_url || (video as any).image || (video as any).previewUrl || 'https://i.imgur.com/STRpELi.jpg';
+                        return (
+                          <div key={video.id} className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center gap-4 group hover:border-neutral-700 transition-all">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-neutral-900 border border-neutral-800 relative flex items-center justify-center">
+                              <img 
+                                src={thumbSrc} 
+                                alt={video.title} 
+                                referrerPolicy="no-referrer"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  if (target.src !== 'https://i.imgur.com/STRpELi.jpg') {
+                                    target.src = 'https://i.imgur.com/STRpELi.jpg';
+                                  }
+                                }}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-bold text-white truncate uppercase tracking-tight">{video.title}</h4>
+                              <p className="text-[11px] text-neutral-400 font-sans font-medium mt-0.5">${typeof video.price === 'number' ? video.price.toFixed(2) : video.price}</p>
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-400 font-sans font-medium">
+                                {video.category || 'Exclusive'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => onDeleteVideo(video.id)}
+                              className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-white hover:text-black text-neutral-400 transition-all cursor-pointer shrink-0"
+                              title="Remove Video from Public Site"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => onDeleteVideo(video.id)}
-                            className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-white hover:text-black text-neutral-400 transition-all cursor-pointer shrink-0"
-                            title="Remove Video from Public Site"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1093,7 +1106,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={livePrice}
                         onChange={(e) => setLivePrice(e.target.value)}
                         placeholder="50.00"
-                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-mono"
+                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-bold text-white focus:border-white focus:outline-none transition-all font-sans"
                       />
                     </div>
                   </div>
@@ -1108,7 +1121,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={liveStreamUrl}
                       onChange={(e) => setLiveStreamUrl(e.target.value)}
                       placeholder="https://..."
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none transition-all font-sans"
                     />
                   </div>
 
@@ -1196,42 +1209,42 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-mono block mb-1">Image 1 URL</span>
+                        <span className="text-[10px] text-neutral-400 font-sans block mb-1">Image 1 URL</span>
                         <input
                           type="url"
                           value={galleryImg1}
                           onChange={(e) => setGalleryImg1(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-mono"
+                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-sans"
                         />
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-mono block mb-1">Image 2 URL</span>
+                        <span className="text-[10px] text-neutral-400 font-sans block mb-1">Image 2 URL</span>
                         <input
                           type="url"
                           value={galleryImg2}
                           onChange={(e) => setGalleryImg2(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-mono"
+                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-sans"
                         />
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-mono block mb-1">Image 3 URL</span>
+                        <span className="text-[10px] text-neutral-400 font-sans block mb-1">Image 3 URL</span>
                         <input
                           type="url"
                           value={galleryImg3}
                           onChange={(e) => setGalleryImg3(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-mono"
+                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-sans"
                         />
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-mono block mb-1">Image 4 URL</span>
+                        <span className="text-[10px] text-neutral-400 font-sans block mb-1">Image 4 URL</span>
                         <input
                           type="url"
                           value={galleryImg4}
                           onChange={(e) => setGalleryImg4(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-mono"
+                          className="w-full px-4 py-3 rounded-xl bg-black border border-neutral-800 text-xs text-white focus:border-white focus:outline-none font-sans"
                         />
                       </div>
                     </div>
@@ -1278,7 +1291,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={tipfunderUrl}
                       onChange={(e) => setTipfunderUrl(e.target.value)}
                       placeholder="https://www.tipfunder.com/..."
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-sans text-white focus:border-white focus:outline-none transition-all"
                     />
                   </div>
 
@@ -1291,7 +1304,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       value={throneUrl}
                       onChange={(e) => setThroneUrl(e.target.value)}
                       placeholder="https://throne.com/..."
-                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
+                      className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-sans text-white focus:border-white focus:outline-none transition-all"
                     />
                   </div>
 
@@ -1305,7 +1318,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={telegramUrl}
                         onChange={(e) => setTelegramUrl(e.target.value)}
                         placeholder="https://t.me/..."
-                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
+                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-sans text-white focus:border-white focus:outline-none transition-all"
                       />
                     </div>
 
@@ -1318,7 +1331,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={xUrl}
                         onChange={(e) => setXUrl(e.target.value)}
                         placeholder="https://x.com/..."
-                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-mono text-white focus:border-white focus:outline-none transition-all"
+                        className="w-full px-4 py-3.5 rounded-xl bg-black border border-neutral-800 text-xs font-sans text-white focus:border-white focus:outline-none transition-all"
                       />
                     </div>
                   </div>
