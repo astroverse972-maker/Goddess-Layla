@@ -109,14 +109,23 @@ app.get("/api/live-status", async (_req, res) => {
   const supabase = getSupabaseServerClient();
   if (supabase) {
     try {
-      const { data } = await supabase
+      const { data: streamData } = await supabase
         .from("site_settings")
         .select("value")
-        .eq("key", "live_status")
+        .eq("key", "live_stream_status")
         .maybeSingle();
 
-      if (data && data.value) {
-        liveStreamState = { ...liveStreamState, ...data.value };
+      if (streamData && streamData.value) {
+        liveStreamState = { ...liveStreamState, ...streamData.value };
+      } else {
+        const { data: legacyData } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "live_status")
+          .maybeSingle();
+        if (legacyData && legacyData.value) {
+          liveStreamState = { ...liveStreamState, ...legacyData.value };
+        }
       }
     } catch (e) {}
   }
@@ -696,11 +705,18 @@ app.post("/api/live-status", async (req, res) => {
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
-        await supabase.from("site_settings").upsert({
-          key: "live_status",
-          value: liveStreamState,
-          updated_at: new Date().toISOString()
-        });
+        await supabase.from("site_settings").upsert([
+          {
+            key: "live_stream_status",
+            value: liveStreamState,
+            updated_at: new Date().toISOString()
+          },
+          {
+            key: "live_status",
+            value: liveStreamState,
+            updated_at: new Date().toISOString()
+          }
+        ]);
       } catch (e) {}
     }
 
@@ -1263,7 +1279,7 @@ app.post("/api/admin/cleanup-legacy", async (req, res) => {
 
 app.get("/api/custom-media", async (_req, res) => {
   const supabase = getSupabaseServerClient();
-  let media = [...customUploadedMedia];
+  let media: any[] = [];
 
   if (supabase) {
     try {
@@ -1275,53 +1291,21 @@ app.get("/api/custom-media", async (_req, res) => {
         });
       }
 
-      // 2. Load from site_settings (custom_media_list)
+      // 2. Load strictly from site_settings (custom_media_list)
       const { data: dbMediaList } = await supabase
         .from("site_settings")
         .select("value")
         .eq("key", "custom_media_list")
         .maybeSingle();
 
-      const siteSettingsMedia = (dbMediaList && Array.isArray(dbMediaList.value)) ? dbMediaList.value : [];
-
-      // 3. Load from content_submissions
-      const { data, error } = await supabase
-        .from("content_submissions")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      let mappedFromDb: any[] = [];
-      if (!error && data && data.length > 0) {
-        mappedFromDb = data.map((row) => ({
-          id: row.id || `db-${Date.now()}`,
-          title: row.title || "Untitled Session",
-          titleEn: row.title || "Untitled Session",
-          category: row.category || "Queen Exclusive",
-          categoryEn: row.category || "Queen Exclusive",
-          price: parseFloat(row.price) || 20.00,
-          previewUrl: row.google_drive_link || row.video_url || "",
-          videoUrl: row.google_drive_link || row.video_url || "",
-          googleDriveLink: row.google_drive_link || row.video_url || "",
-          thumbnailUrl: row.thumbnail_url || "",
-          duration: "Full length",
-          description: row.description || "Exclusive session published by Goddess Milana.",
-          descriptionEn: row.description || "Exclusive session published by Goddess Milana.",
-          tags: Array.isArray(row.tags) ? row.tags : ["goddessmilana", "exclusive"],
-          createdAt: row.created_at
-        }));
+      if (dbMediaList && Array.isArray(dbMediaList.value)) {
+        media = dbMediaList.value;
       }
-
-      const map = new Map();
-      for (const item of [...siteSettingsMedia, ...mappedFromDb, ...customUploadedMedia]) {
-        const key = item.googleDriveLink || item.previewUrl || item.id;
-        if (key && !map.has(key)) {
-          map.set(key, item);
-        }
-      }
-      media = Array.from(map.values());
     } catch (sbErr) {
       console.warn("Supabase custom-media query warning:", sbErr);
     }
+  } else {
+    media = [...customUploadedMedia];
   }
 
   // Filter out soft-deleted videos for public view
