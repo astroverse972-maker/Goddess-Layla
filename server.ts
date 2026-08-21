@@ -393,6 +393,87 @@ app.post("/api/admin/onboarding-complete", async (req, res) => {
   return res.json({ success: true, message: "Onboarding completed successfully!" });
 });
 
+// POST /api/admin/upload-profile-image - Upload profile photo directly to Supabase storage (profile_assets)
+app.post("/api/admin/upload-profile-image", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { fileName, fileData, contentType } = req.body || {};
+  if (!fileData) {
+    return res.status(400).json({ error: "fileData (base64) is required." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not configured." });
+  }
+
+  try {
+    const cleanName = String(fileName || "portrait.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `portraits/${Date.now()}_${cleanName}`;
+    const base64Data = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    const buffer = Buffer.from(base64Data, "base64");
+    const mimeType = contentType || "image/jpeg";
+
+    const buckets = ["profile_assets", "profile_photos", "profile_images"];
+    let uploadedBucket = "";
+    let uploadError = null;
+
+    for (const bName of buckets) {
+      const { error: upErr } = await supabase.storage
+        .from(bName)
+        .upload(storagePath, buffer, { contentType: mimeType, upsert: true });
+      if (!upErr) {
+        uploadedBucket = bName;
+        break;
+      } else {
+        uploadError = upErr;
+      }
+    }
+
+    if (!uploadedBucket) {
+      return res.status(500).json({
+        error: uploadError?.message || "Failed to upload image to Supabase storage bucket (profile_assets)."
+      });
+    }
+
+    const { data: publicData } = supabase.storage.from(uploadedBucket).getPublicUrl(storagePath);
+    const publicUrl = publicData?.publicUrl || "";
+
+    // Sync to creator profile state in memory and database
+    creatorProfileState.avatar = publicUrl;
+    centralSiteSettingsState.avatar_url = publicUrl;
+
+    try {
+      await supabase.from("site_settings").upsert([
+        {
+          key: "creator_profile",
+          value: creatorProfileState,
+          updated_at: new Date().toISOString()
+        },
+        {
+          key: "central_site_settings",
+          value: centralSiteSettingsState,
+          updated_at: new Date().toISOString()
+        }
+      ]);
+    } catch (dbErr) {
+      console.warn("Notice: updated memory profile, DB upsert notice:", dbErr);
+    }
+
+    return res.json({
+      success: true,
+      publicUrl,
+      storagePath,
+      bucket: uploadedBucket
+    });
+  } catch (err: any) {
+    console.error("[PROFILE IMAGE UPLOAD ERROR]:", err);
+    return res.status(500).json({ error: err.message || "Internal server error uploading image." });
+  }
+});
+
 // POST /api/admin/storage/profile-upload-url - Upload portrait / profile photo to Supabase storage
 app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
   if (!checkIsAdmin(req)) {
@@ -407,201 +488,315 @@ app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
 
   try {
     const cleanName = String(fileName || "portrait.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `profiles/${Date.now()}_${cleanName}`;
+    const storagePath = `portraits/${Date.now()}_${cleanName}`;
 
-    // Try creating signed upload URL in 'profile_photos' or 'premium_videos' bucket
-    let bucketName = "profile_photos";
-    let { data, error } = await supabase.storage.from(bucketName).createSignedUploadUrl(storagePath);
+    // Try creating signed upload URL in 'profile_assets' then 'profile_photos' or 'profile_images'
+    const buckets = ["profile_assets", "profile_photos", "profile_images"];
+    let chosenBucket = "";
+    let dataResult: any = null;
+    let lastError: any = null;
 
-    if (error) {
-      // Fallback to premium_videos bucket
-      bucketName = "premium_videos";
-      const fb = await supabase.storage.from(bucketName).createSignedUploadUrl(storagePath);
-      data = fb.data;
-      error = fb.error;
+    for (const bName of buckets) {
+      const { data, error } = await supabase.storage.from(bName).createSignedUploadUrl(storagePath);
+      if (!error && data) {
+        chosenBucket = bName;
+        dataResult = data;
+        break;
+      }
+      lastError = error;
     }
 
-    if (error || !data) {
-      return res.status(500).json({ error: error?.message || "Failed to create signed upload URL." });
+    if (!chosenBucket || !dataResult) {
+      return res.status(500).json({ error: lastError?.message || "Failed to create signed upload URL in profile_assets bucket." });
     }
 
-    const { data: publicData } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
+    const { data: publicData } = supabase.storage.from(chosenBucket).getPublicUrl(storagePath);
 
     return res.json({
       success: true,
-      signedUrl: data.signedUrl,
-      publicUrl: publicData?.publicUrl || data.signedUrl.split("?")[0],
+      signedUrl: dataResult.signedUrl,
+      publicUrl: publicData?.publicUrl || dataResult.signedUrl.split("?")[0],
       storagePath,
-      bucket: bucketName
+      bucket: chosenBucket
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed generating upload URL" });
   }
 });
 
-// In-Memory Payment Requests Cache with Supabase synchronization
+// In-Memory Payment Requests Cache with Supabase synchronization (No fake demo data)
 const pendingPaymentRequests: Array<{
   id: string;
-  fanIdentifier: string;
-  paymentMethod: string;
-  transactionRef: string;
-  itemId: string;
-  itemTitle: string;
+  video_id?: string;
+  video_title?: string;
+  itemId?: string;
+  itemTitle?: string;
+  fan_identifier?: string;
+  fanIdentifier?: string;
+  payment_method?: string;
+  paymentMethod?: string;
+  transaction_ref?: string;
+  transactionRef?: string;
   amount: string | number;
   status: "pending" | "approved" | "rejected";
+  delivery_link?: string | null;
+  deliveryLink?: string | null;
+  google_drive_link?: string | null;
+  googleDriveLink?: string | null;
   unlockToken?: string;
-  createdAt: string;
-  reviewedAt?: string;
-}> = [
-  {
-    id: "req-sample-1",
-    fanIdentifier: "@SubmissiveDevotee",
-    paymentMethod: "Throne",
-    transactionRef: "THRONE-GIFT-99214",
-    itemId: "vid-1",
-    itemTitle: "Koninklijke Onderwerping Deel 1",
-    amount: "25.00 €",
-    status: "pending",
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-  }
-];
+  created_at?: string;
+  createdAt?: string;
+  reviewed_at?: string | null;
+  reviewedAt?: string | null;
+}> = [];
 
-// GET /api/admin/payment-requests - Fetch all payment verification submissions
+// Helper to normalize and sanitize real payment requests
+function normalizePaymentRequest(item: any) {
+  const videoId = item.video_id || item.videoId || item.itemId || "media-asset";
+  const videoTitle = item.video_title || item.videoTitle || item.itemTitle || "Exclusive Video Archive";
+  const fanId = item.fan_identifier || item.fanIdentifier || "Anonymous Devotee";
+  const method = item.payment_method || item.paymentMethod || "Throne";
+  const ref = item.transaction_ref || item.transactionRef || "Direct";
+  const amount = item.amount || "35.00 €";
+  const status = item.status || "pending";
+  const createdAt = item.created_at || item.createdAt || new Date().toISOString();
+  const reviewedAt = item.reviewed_at || item.reviewedAt || null;
+  const deliveryLink = item.delivery_link || item.deliveryLink || null;
+  const googleDriveLink = item.google_drive_link || item.googleDriveLink || null;
+
+  return {
+    id: String(item.id),
+    video_id: videoId,
+    video_title: videoTitle,
+    itemId: videoId,
+    itemTitle: videoTitle,
+    fan_identifier: fanId,
+    fanIdentifier: fanId,
+    payment_method: method,
+    paymentMethod: method,
+    transaction_ref: ref,
+    transactionRef: ref,
+    amount: String(amount),
+    status: status,
+    delivery_link: deliveryLink,
+    deliveryLink: deliveryLink,
+    google_drive_link: googleDriveLink,
+    googleDriveLink: googleDriveLink,
+    created_at: createdAt,
+    createdAt: createdAt,
+    reviewed_at: reviewedAt,
+    reviewedAt: reviewedAt
+  };
+}
+
+// GET /api/admin/payment-requests - Fetch all genuine payment verification submissions
 app.get("/api/admin/payment-requests", async (req, res) => {
   if (!checkIsAdmin(req)) {
     return res.status(401).json({ error: "Unauthorized. Admin session required." });
   }
 
   const supabase = getSupabaseServerClient();
-  let requests = [...pendingPaymentRequests];
+  let rawRequests: any[] = [...pendingPaymentRequests];
 
   if (supabase) {
     try {
-      const { data } = await supabase
+      // 1. Check payment_requests table
+      const { data: tableData, error: tableErr } = await supabase
+        .from("payment_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!tableErr && tableData && Array.isArray(tableData)) {
+        rawRequests = [...tableData, ...rawRequests];
+      }
+
+      // 2. Also check site_settings fallback queue
+      const { data: queueData } = await supabase
         .from("site_settings")
         .select("value")
         .eq("key", "payment_requests_queue")
         .maybeSingle();
 
-      if (data && Array.isArray(data.value)) {
-        requests = data.value;
+      if (queueData && Array.isArray(queueData.value)) {
+        rawRequests = [...rawRequests, ...queueData.value];
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Notice: payment requests fetch fallback to memory:", e);
+    }
   }
 
-  res.json({ success: true, requests });
+  // Deduplicate by ID and strictly exclude any fake/legacy demo sample items
+  const map = new Map<string, any>();
+  for (const item of rawRequests) {
+    if (!item || !item.id) continue;
+    // Strictly filter out any sample/mock data items
+    if (String(item.id).startsWith("req-sample") || String(item.transaction_ref || item.transactionRef || "").includes("99214")) {
+      continue;
+    }
+    if (!map.has(item.id)) {
+      map.set(item.id, normalizePaymentRequest(item));
+    }
+  }
+
+  const requests = Array.from(map.values()).sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  return res.json({ success: true, requests });
 });
 
-// POST /api/admin/payment-requests/:id/action - Approve or Reject payment request
-app.post("/api/admin/payment-requests/:id/action", async (req, res) => {
+// Common handler for approving/rejecting a payment request
+async function handlePaymentAction(req: express.Request, res: express.Response, forceAction?: "approve" | "reject") {
   if (!checkIsAdmin(req)) {
     return res.status(401).json({ error: "Unauthorized. Admin session required." });
   }
 
   const { id } = req.params;
-  const { action } = req.body || {}; // 'approve' | 'reject'
+  const action = forceAction || req.body?.action;
+
+  if (!["approve", "reject"].includes(action)) {
+    return res.status(400).json({ error: "Action must be 'approve' or 'reject'." });
+  }
+
+  const newStatus = action === "approve" ? "approved" : "rejected";
+  const reviewedAt = new Date().toISOString();
   const supabase = getSupabaseServerClient();
 
+  // Find in memory or locate target
   let target = pendingPaymentRequests.find(r => r.id === id);
-  if (!target && supabase) {
-    try {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "payment_requests_queue")
-        .maybeSingle();
-
-      if (data && Array.isArray(data.value)) {
-        const found = data.value.find((r: any) => r.id === id);
-        if (found) target = found;
-      }
-    } catch (e) {}
-  }
-
-  if (!target) {
-    // Create dynamically if tested
-    target = {
-      id,
-      fanIdentifier: "VIP Volgeling",
-      paymentMethod: "Throne / TipFunder",
-      transactionRef: "REF-" + id,
-      itemId: "custom-media",
-      itemTitle: "Exclusieve Video",
-      amount: "25.00 €",
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    pendingPaymentRequests.push(target);
-  }
+  let deliveryLink: string | null = null;
+  let googleDriveUrl: string | null = null;
 
   if (action === "approve") {
-    target.status = "approved";
-    target.reviewedAt = new Date().toISOString();
-    const token = `ACCESS-${target.itemId}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-    target.unlockToken = token;
-    verifiedAccessTokens.set(token, { itemId: target.itemId, timestamp: Date.now() });
+    const targetVideoId = target?.video_id || target?.itemId || id;
+    const token = `ACCESS-${targetVideoId}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    deliveryLink = `${req.protocol}://${req.get("host") || "localhost:3000"}/#unlock=${token}`;
 
-    // Save grant to Supabase
+    const matchingMedia = customUploadedMedia.find(m => m.id === targetVideoId);
+    if (matchingMedia && matchingMedia.googleDriveLink) {
+      googleDriveUrl = matchingMedia.googleDriveLink;
+    } else if (req.body?.deliveryLink) {
+      googleDriveUrl = req.body.deliveryLink;
+    }
+
+    verifiedAccessTokens.set(token, {
+      itemId: targetVideoId,
+      timestamp: Date.now()
+    });
+
     if (supabase) {
       try {
         await supabase.from("access_grants").insert({
-          video_id: target.itemId,
-          video_title: target.itemTitle,
-          fan_identifier: target.fanIdentifier,
+          video_id: targetVideoId,
+          video_title: target?.video_title || target?.itemTitle || "Exclusive Media Asset",
+          fan_identifier: target?.fan_identifier || target?.fanIdentifier || "Authorized Buyer",
           link_reference: token,
-          generated_at: new Date().toISOString(),
+          generated_at: reviewedAt,
           expires_at: new Date(Date.now() + 86400 * 1000).toISOString()
         });
       } catch (e) {}
     }
-  } else {
-    target.status = "rejected";
-    target.reviewedAt = new Date().toISOString();
   }
 
-  // Persist updated list
+  if (target) {
+    target.status = newStatus;
+    target.reviewed_at = reviewedAt;
+    target.reviewedAt = reviewedAt;
+    if (deliveryLink) {
+      target.delivery_link = deliveryLink;
+      target.deliveryLink = deliveryLink;
+    }
+    if (googleDriveUrl) {
+      target.google_drive_link = googleDriveUrl;
+      target.googleDriveLink = googleDriveUrl;
+    }
+  }
+
   if (supabase) {
+    try {
+      await supabase
+        .from("payment_requests")
+        .update({
+          status: newStatus,
+          reviewed_at: reviewedAt,
+          delivery_link: deliveryLink
+        })
+        .eq("id", id);
+    } catch (e) {}
+
     try {
       await supabase.from("site_settings").upsert({
         key: "payment_requests_queue",
         value: pendingPaymentRequests,
-        updated_at: new Date().toISOString()
+        updated_at: reviewedAt
       });
     } catch (e) {}
   }
 
   return res.json({
     success: true,
-    request: target,
-    message: action === "approve" ? "Betalingsverzoek goedgekeurd!" : "Betalingsverzoek geweigerd."
+    status: newStatus,
+    deliveryLink,
+    googleDriveUrl,
+    message: action === "approve"
+      ? "Asset geautoriseerd. Veilige Google Drive archieflink vrijgegeven."
+      : "Transactie geweigerd. Toegang ontzegd."
   });
-});
+}
 
-// POST /api/submit-payment-request - Devotee submits proof of tribute/payment
-app.post("/api/submit-payment-request", async (req, res) => {
+// POST /api/admin/payment-requests/:id/action
+app.post("/api/admin/payment-requests/:id/action", (req, res) => handlePaymentAction(req, res));
+
+// POST /api/admin/payment-requests/:id/approve
+app.post("/api/admin/payment-requests/:id/approve", (req, res) => handlePaymentAction(req, res, "approve"));
+
+// POST /api/admin/payment-requests/:id/reject
+app.post("/api/admin/payment-requests/:id/reject", (req, res) => handlePaymentAction(req, res, "reject"));
+
+// POST /api/payment-requests/submit & /api/submit-payment-request - Devotee submits real proof of tribute/payment
+const handleClientPaymentSubmission = async (req: express.Request, res: express.Response) => {
   try {
-    const { fanIdentifier, paymentMethod, transactionRef, itemId, itemTitle, amount } = req.body || {};
+    const { videoId, itemId, videoTitle, itemTitle, fanIdentifier, paymentMethod, transactionRef, amount } = req.body || {};
 
-    if (!transactionRef || !itemId) {
-      return res.status(400).json({ error: "Transactiereferentie en item ID zijn verplicht." });
+    const targetId = videoId || itemId;
+    if (!targetId) {
+      return res.status(400).json({ error: "Media item ID is verplicht." });
     }
 
-    const newReq = {
-      id: `req-${Date.now()}`,
-      fanIdentifier: fanIdentifier ? String(fanIdentifier).trim() : "Anonieme Volgeling",
-      paymentMethod: paymentMethod ? String(paymentMethod).trim() : "Throne",
-      transactionRef: String(transactionRef).trim(),
-      itemId: String(itemId).trim(),
-      itemTitle: itemTitle ? String(itemTitle).trim() : "Exclusieve Video",
-      amount: amount || "20.00 €",
-      status: "pending" as const,
-      createdAt: new Date().toISOString()
-    };
+    const newRequest = normalizePaymentRequest({
+      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      video_id: String(targetId),
+      video_title: videoTitle || itemTitle || "Exclusief Video-Archief",
+      fan_identifier: fanIdentifier ? String(fanIdentifier).trim() : "Anonieme Volgeling",
+      payment_method: paymentMethod || "Throne",
+      transaction_ref: transactionRef ? String(transactionRef).trim() : "Directe Hulde",
+      amount: amount ? String(amount).trim() : "35.00 €",
+      status: "pending",
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      delivery_link: null
+    });
 
-    pendingPaymentRequests.unshift(newReq);
+    pendingPaymentRequests.unshift(newRequest);
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
+      try {
+        await supabase.from("payment_requests").insert({
+          id: newRequest.id,
+          video_id: newRequest.video_id,
+          video_title: newRequest.video_title,
+          fan_identifier: newRequest.fan_identifier,
+          payment_method: newRequest.payment_method,
+          transaction_ref: newRequest.transaction_ref,
+          amount: newRequest.amount,
+          status: newRequest.status,
+          created_at: newRequest.created_at
+        });
+      } catch (dbErr) {
+        console.warn("Supabase payment_requests table insert note:", dbErr);
+      }
+
       try {
         await supabase.from("site_settings").upsert({
           key: "payment_requests_queue",
@@ -613,13 +808,16 @@ app.post("/api/submit-payment-request", async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Uw betalingsverzoek is met eerbied ingediend bij Godin Milana. Zodra zij uw hulde goedkeurt, wordt uw toegang vrijgegeven.",
-      request: newReq
+      message: "Uw verificatieverzoek is ingediend bij Godin Milana. Zodra zij uw hulde autoriseert, wordt uw toegang vrijgegeven.",
+      request: newRequest
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
-});
+};
+
+app.post("/api/payment-requests/submit", handleClientPaymentSubmission);
+app.post("/api/submit-payment-request", handleClientPaymentSubmission);
 
 // POST /api/admin/logout - Clear HTTP-Only session cookie
 app.post("/api/admin/logout", (_req, res) => {
@@ -793,9 +991,6 @@ let paymentSettingsState = {
   x: ""
 };
 
-// In-Memory Fallback Registry for Unlock / Payment Requests (Step 6 Accept/Reject Queue)
-const inMemoryPaymentRequests: any[] = [];
-
 // GET /api/site-settings
 app.get("/api/site-settings", async (_req, res) => {
   const supabase = getSupabaseServerClient();
@@ -936,154 +1131,6 @@ app.post("/api/creator-profile", async (req, res) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
-});
-
-// GET /api/admin/payment-requests - Fetch pending and reviewed unlock requests for Goddess Milana's dashboard
-app.get("/api/admin/payment-requests", async (req, res) => {
-  if (!checkIsAdmin(req)) {
-    return res.status(401).json({ error: "Unauthorized. Admin session required." });
-  }
-
-  const supabase = getSupabaseServerClient();
-  let requests = [...inMemoryPaymentRequests];
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("payment_requests")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        const map = new Map();
-        for (const item of [...data, ...inMemoryPaymentRequests]) {
-          const key = item.id;
-          if (!map.has(key)) map.set(key, item);
-        }
-        requests = Array.from(map.values());
-      }
-    } catch (e) {
-      console.warn("Error fetching payment_requests from Supabase:", e);
-    }
-  }
-
-  return res.json({ success: true, requests });
-});
-
-// POST /api/payment-requests/submit - Devotee submits proof of payment (Throne/TipFunder) to unlock a video
-app.post("/api/payment-requests/submit", async (req, res) => {
-  try {
-    const { videoId, videoTitle, fanIdentifier, paymentMethod, transactionRef, amount } = req.body || {};
-
-    if (!videoId || !fanIdentifier) {
-      return res.status(400).json({ error: "Video ID and fan identifier are required." });
-    }
-
-    const newRequest = {
-      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      video_id: String(videoId),
-      video_title: videoTitle || "Exclusive Session",
-      fan_identifier: String(fanIdentifier).trim(),
-      payment_method: paymentMethod || "throne",
-      transaction_ref: transactionRef ? String(transactionRef).trim() : "Direct Payment",
-      amount: amount ? String(amount).trim() : "20.00 €",
-      status: "pending",
-      delivery_link: null,
-      created_at: new Date().toISOString(),
-      reviewed_at: null
-    };
-
-    inMemoryPaymentRequests.unshift(newRequest);
-
-    const supabase = getSupabaseServerClient();
-    if (supabase) {
-      try {
-        await supabase.from("payment_requests").insert(newRequest);
-      } catch (dbErr) {
-        console.warn("Supabase payment_requests insert notice:", dbErr);
-      }
-    }
-
-    return res.json({
-      success: true,
-      message: "Uw verificatieverzoek is ingediend. Godin Milana zal uw betaling verifiëren en uw toegang ontgrendelen.",
-      request: newRequest
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/admin/payment-requests/:id/action - Goddess Milana Accepts or Rejects the fan's payment
-app.post("/api/admin/payment-requests/:id/action", async (req, res) => {
-  if (!checkIsAdmin(req)) {
-    return res.status(401).json({ error: "Unauthorized. Admin session required." });
-  }
-
-  const { id } = req.params;
-  const { action } = req.body; // 'approve' or 'reject'
-
-  if (!["approve", "reject"].includes(action)) {
-    return res.status(400).json({ error: "Action must be either 'approve' or 'reject'." });
-  }
-
-  const newStatus = action === "approve" ? "approved" : "rejected";
-  const reviewedAt = new Date().toISOString();
-
-  // Find matching request
-  let foundReq = inMemoryPaymentRequests.find((r) => r.id === id);
-  let deliveryLink: string | null = null;
-  let googleDriveUrl: string | null = null;
-
-  if (action === "approve") {
-    // Generate secure access token & delivery link
-    const targetVideoId = foundReq?.video_id || id;
-    const token = `ACCESS-${targetVideoId}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    deliveryLink = `${req.protocol}://${req.get("host") || "localhost:3000"}/#unlock=${token}`;
-
-    const matchingMedia = customUploadedMedia.find(m => m.id === targetVideoId);
-    if (matchingMedia && matchingMedia.googleDriveLink) {
-      googleDriveUrl = matchingMedia.googleDriveLink;
-    }
-
-    verifiedAccessTokens.set(token, {
-      itemId: targetVideoId,
-      timestamp: Date.now()
-    });
-  }
-
-  if (foundReq) {
-    foundReq.status = newStatus;
-    foundReq.reviewed_at = reviewedAt;
-    if (deliveryLink) foundReq.delivery_link = deliveryLink;
-    if (googleDriveUrl) foundReq.google_drive_link = googleDriveUrl;
-  }
-
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    try {
-      await supabase
-        .from("payment_requests")
-        .update({
-          status: newStatus,
-          reviewed_at: reviewedAt,
-          delivery_link: deliveryLink
-        })
-        .eq("id", id);
-    } catch (e) {
-      console.warn("Supabase update payment_requests error:", e);
-    }
-  }
-
-  return res.json({
-    success: true,
-    status: newStatus,
-    deliveryLink,
-    googleDriveUrl,
-    message: action === "approve" 
-      ? "Asset geautoriseerd. Veilige Google Drive archieflink vrijgegeven." 
-      : "Transactie geweigerd. Toegang ontzegd."
-  });
 });
 
 // GET /api/payment-settings
