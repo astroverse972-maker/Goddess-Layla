@@ -88,7 +88,7 @@ export function MainAppContent() {
     // Check if URL indicates admin portal request strictly via path /admin
     const checkAdminRoute = () => {
       const path = window.location.pathname.toLowerCase();
-      if (path === '/admin' || path === '/admin/') {
+      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) {
         setIsMistressAdminOpen(true);
       } else {
         setIsMistressAdminOpen(false);
