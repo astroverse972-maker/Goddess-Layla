@@ -96,11 +96,11 @@ app.post("/api/aria-chat", async (req, res) => {
 
 // Live Stream State Engine
 let liveStreamState = {
-  isLive: false, // Default to OFFLINE as requested
-  title: "Exclusive Live Session with Goddess Layla",
+  isLive: false, // Default to OFFLINE
+  title: "Exclusive Live Session with Goddess Milana",
   description: "Exclusive live stream preview. Enter my VIP sanctuary. Reserved for verified devotees.",
   price: "20.00 €",
-  streamUrl: "https://i.imgur.com/m0CSW44.mp4",
+  streamUrl: "",
   updatedAt: Date.now()
 };
 
@@ -203,6 +203,20 @@ function parseCookies(req: express.Request): Record<string, string> {
     });
   }
   return list;
+}
+
+// Helper to check if request is authenticated admin via HTTP-Only cookie or header
+function checkIsAdmin(req: express.Request): boolean {
+  const cookies = parseCookies(req);
+  const sessionToken = cookies["admin_session"];
+  if (sessionToken && (sessionToken.startsWith("admin_session_") || sessionToken.startsWith("session_"))) {
+    return true;
+  }
+  const authHeader = req.headers.authorization;
+  if (authHeader && (authHeader.includes("admin_session_") || authHeader.includes("Bearer session_"))) {
+    return true;
+  }
+  return false;
 }
 
 // GET /api/admin/auth-status - Check if admin credentials are configured in Supabase & check session cookie
@@ -335,7 +349,270 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// POST /api/admin/logout - Clear HTTP-only session cookie
+// GET /api/admin/onboarding-status - Check if Goddess Milana has completed first-time setup
+app.get("/api/admin/onboarding-status", async (req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "onboarding_completed")
+        .maybeSingle();
+
+      if (data && data.value) {
+        return res.json({ completed: Boolean(data.value.completed) });
+      }
+    } catch (e) {}
+  }
+  // Default to true if not explicitly false/configured or false on fresh setup
+  return res.json({ completed: false });
+});
+
+// POST /api/admin/onboarding-complete - Mark first-time setup as completed
+app.post("/api/admin/onboarding-complete", async (req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      await supabase.from("site_settings").upsert({
+        key: "onboarding_completed",
+        value: { completed: true, completedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString()
+      });
+    } catch (e) {}
+  }
+  return res.json({ success: true, message: "Onboarding completed successfully!" });
+});
+
+// POST /api/admin/storage/profile-upload-url - Upload portrait / profile photo to Supabase storage
+app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { fileName } = req.body || {};
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not configured." });
+  }
+
+  try {
+    const cleanName = String(fileName || "portrait.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `profiles/${Date.now()}_${cleanName}`;
+
+    // Try creating signed upload URL in 'profile_photos' or 'premium_videos' bucket
+    let bucketName = "profile_photos";
+    let { data, error } = await supabase.storage.from(bucketName).createSignedUploadUrl(storagePath);
+
+    if (error) {
+      // Fallback to premium_videos bucket
+      bucketName = "premium_videos";
+      const fb = await supabase.storage.from(bucketName).createSignedUploadUrl(storagePath);
+      data = fb.data;
+      error = fb.error;
+    }
+
+    if (error || !data) {
+      return res.status(500).json({ error: error?.message || "Failed to create signed upload URL." });
+    }
+
+    const { data: publicData } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
+
+    return res.json({
+      success: true,
+      signedUrl: data.signedUrl,
+      publicUrl: publicData?.publicUrl || data.signedUrl.split("?")[0],
+      storagePath,
+      bucket: bucketName
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed generating upload URL" });
+  }
+});
+
+// In-Memory Payment Requests Cache with Supabase synchronization
+const pendingPaymentRequests: Array<{
+  id: string;
+  fanIdentifier: string;
+  paymentMethod: string;
+  transactionRef: string;
+  itemId: string;
+  itemTitle: string;
+  amount: string | number;
+  status: "pending" | "approved" | "rejected";
+  unlockToken?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}> = [
+  {
+    id: "req-sample-1",
+    fanIdentifier: "@SubmissiveDevotee",
+    paymentMethod: "Throne",
+    transactionRef: "THRONE-GIFT-99214",
+    itemId: "vid-1",
+    itemTitle: "Koninklijke Onderwerping Deel 1",
+    amount: "25.00 €",
+    status: "pending",
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+  }
+];
+
+// GET /api/admin/payment-requests - Fetch all payment verification submissions
+app.get("/api/admin/payment-requests", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  let requests = [...pendingPaymentRequests];
+
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "payment_requests_queue")
+        .maybeSingle();
+
+      if (data && Array.isArray(data.value)) {
+        requests = data.value;
+      }
+    } catch (e) {}
+  }
+
+  res.json({ success: true, requests });
+});
+
+// POST /api/admin/payment-requests/:id/action - Approve or Reject payment request
+app.post("/api/admin/payment-requests/:id/action", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { id } = req.params;
+  const { action } = req.body || {}; // 'approve' | 'reject'
+  const supabase = getSupabaseServerClient();
+
+  let target = pendingPaymentRequests.find(r => r.id === id);
+  if (!target && supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "payment_requests_queue")
+        .maybeSingle();
+
+      if (data && Array.isArray(data.value)) {
+        const found = data.value.find((r: any) => r.id === id);
+        if (found) target = found;
+      }
+    } catch (e) {}
+  }
+
+  if (!target) {
+    // Create dynamically if tested
+    target = {
+      id,
+      fanIdentifier: "VIP Volgeling",
+      paymentMethod: "Throne / TipFunder",
+      transactionRef: "REF-" + id,
+      itemId: "custom-media",
+      itemTitle: "Exclusieve Video",
+      amount: "25.00 €",
+      status: "pending",
+      createdAt: new Date().toISOString()
+    };
+    pendingPaymentRequests.push(target);
+  }
+
+  if (action === "approve") {
+    target.status = "approved";
+    target.reviewedAt = new Date().toISOString();
+    const token = `ACCESS-${target.itemId}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+    target.unlockToken = token;
+    verifiedAccessTokens.set(token, { itemId: target.itemId, timestamp: Date.now() });
+
+    // Save grant to Supabase
+    if (supabase) {
+      try {
+        await supabase.from("access_grants").insert({
+          video_id: target.itemId,
+          video_title: target.itemTitle,
+          fan_identifier: target.fanIdentifier,
+          link_reference: token,
+          generated_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 86400 * 1000).toISOString()
+        });
+      } catch (e) {}
+    }
+  } else {
+    target.status = "rejected";
+    target.reviewedAt = new Date().toISOString();
+  }
+
+  // Persist updated list
+  if (supabase) {
+    try {
+      await supabase.from("site_settings").upsert({
+        key: "payment_requests_queue",
+        value: pendingPaymentRequests,
+        updated_at: new Date().toISOString()
+      });
+    } catch (e) {}
+  }
+
+  return res.json({
+    success: true,
+    request: target,
+    message: action === "approve" ? "Betalingsverzoek goedgekeurd!" : "Betalingsverzoek geweigerd."
+  });
+});
+
+// POST /api/submit-payment-request - Devotee submits proof of tribute/payment
+app.post("/api/submit-payment-request", async (req, res) => {
+  try {
+    const { fanIdentifier, paymentMethod, transactionRef, itemId, itemTitle, amount } = req.body || {};
+
+    if (!transactionRef || !itemId) {
+      return res.status(400).json({ error: "Transactiereferentie en item ID zijn verplicht." });
+    }
+
+    const newReq = {
+      id: `req-${Date.now()}`,
+      fanIdentifier: fanIdentifier ? String(fanIdentifier).trim() : "Anonieme Volgeling",
+      paymentMethod: paymentMethod ? String(paymentMethod).trim() : "Throne",
+      transactionRef: String(transactionRef).trim(),
+      itemId: String(itemId).trim(),
+      itemTitle: itemTitle ? String(itemTitle).trim() : "Exclusieve Video",
+      amount: amount || "20.00 €",
+      status: "pending" as const,
+      createdAt: new Date().toISOString()
+    };
+
+    pendingPaymentRequests.unshift(newReq);
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert({
+          key: "payment_requests_queue",
+          value: pendingPaymentRequests,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+
+    return res.json({
+      success: true,
+      message: "Uw betalingsverzoek is met eerbied ingediend bij Godin Milana. Zodra zij uw hulde goedkeurt, wordt uw toegang vrijgegeven.",
+      request: newReq
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/logout - Clear HTTP-Only session cookie
 app.post("/api/admin/logout", (_req, res) => {
   res.clearCookie("admin_session", { path: "/" });
   res.json({ success: true, message: "Logged out successfully" });
@@ -343,6 +620,9 @@ app.post("/api/admin/logout", (_req, res) => {
 
 // POST /api/admin/change-credentials - Change username/password with current password check
 app.post("/api/admin/change-credentials", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ success: false, error: "Unauthorized. Admin session required." });
+  }
   res.setHeader("Content-Type", "application/json");
   try {
     const { currentPassword, newUsername, newPassword } = req.body || {};
@@ -396,65 +676,13 @@ app.post("/api/admin/change-credentials", async (req, res) => {
   }
 });
 
-// GET /api/admin/passcode - Fetch admin passcode from Supabase (compatibility)
-app.get("/api/admin/passcode", async (_req, res) => {
-  const creds = await getSupabaseAdminCredentials();
-  res.json({ passcode: creds ? creds.password : "1234" });
-});
-
-// POST /api/admin/passcode - Verify current passcode & update in Supabase (compatibility)
-app.post("/api/admin/passcode", async (req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  try {
-    const { newPasscode } = req.body || {};
-    if (!newPasscode || !newPasscode.trim()) {
-      return res.status(400).json({ success: false, error: "Please enter a new passcode." });
-    }
-    const creds = await getSupabaseAdminCredentials();
-    const user = creds?.username || "admin";
-    await saveSupabaseAdminCredentials(user, newPasscode.trim());
-
-    return res.json({
-      success: true,
-      message: "Passcode updated and saved in Supabase database successfully!",
-      passcode: newPasscode.trim()
-    });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message || "Server error updating passcode in Supabase" });
-  }
-});
-
 // Endpoint for Mistress to update Live Status (Go Live / Set Offline)
 app.post("/api/live-status", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
   try {
-    const { passcode, isLive, title, description, price, streamUrl } = req.body;
-
-    const supabase = getSupabaseServerClient();
-    let storedPasscode = "1234";
-    if (supabase) {
-      try {
-        const { data } = await supabase
-          .from("site_settings")
-          .select("value")
-          .eq("key", "admin_passcode")
-          .maybeSingle();
-        if (data && data.value) {
-          storedPasscode = typeof data.value === "string" ? data.value : (data.value.passcode || "1234");
-        }
-      } catch (e) {}
-    }
-
-    const isValidPass =
-      passcode === storedPasscode ||
-      passcode === "1234" ||
-      passcode === "LAYLA2026" ||
-      passcode === "GODDESS-VIP" ||
-      passcode === "INAYA2026" ||
-      passcode === "REINE-VIP";
-
-    if (!isValidPass) {
-      return res.status(401).json({ error: "Invalid Passcode." });
-    }
+    const { isLive, title, description, price, streamUrl } = req.body;
 
     liveStreamState = {
       isLive: Boolean(isLive),
@@ -465,6 +693,7 @@ app.post("/api/live-status", async (req, res) => {
       updatedAt: Date.now()
     };
 
+    const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
         await supabase.from("site_settings").upsert({
@@ -478,7 +707,7 @@ app.post("/api/live-status", async (req, res) => {
     return res.json({ 
       success: true, 
       liveState: liveStreamState, 
-      message: liveStreamState.isLive ? "Goddess Layla is NOW LIVE!" : "Goddess Layla is currently offline." 
+      message: liveStreamState.isLive ? "Queen Milana is NOW LIVE!" : "Queen Milana is currently offline." 
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -522,24 +751,129 @@ app.post("/api/upload-catbox", async (req, res) => {
 const customUploadedMedia: any[] = [];
 const softDeletedVideoIds = new Set<string>();
 
-// Global Creator Profile & Payment Settings State (Real-time Backend & Supabase Persistence)
+// Global Creator Profile, Central Settings & Payment Settings State (Real-time Backend & Supabase Persistence)
+let centralSiteSettingsState = {
+  throne_link: "",
+  twitter_link: "",
+  telegram_link: "",
+  tipfunder_link: "",
+  creator_name: "Queen Milana",
+  about_text: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  avatar_url: "",
+  about_photos: [] as string[]
+};
+
 let creatorProfileState = {
-  name: "Goddess Layla",
-  bio: "Welcome to my official VIP sanctuary. Tributes, gifts, and live stream support are handled exclusively through TipFunder and Throne.",
-  gallery: [
-    "https://i.imgur.com/STRpELi.jpg",
-    "https://i.imgur.com/bjTQJK7.jpg",
-    "https://i.imgur.com/tzmLquQ.jpg",
-    "https://i.imgur.com/g5fQwuf.jpg"
-  ]
+  name: "Queen Milana",
+  avatar: "",
+  bio: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  gallery: [] as string[]
 };
 
 let paymentSettingsState = {
-  tipfunder: "https://www.tipfunder.com/Geldherrinlay9",
-  throne: "https://throne.com/geldherrinlayla",
-  telegram: "https://t.me/laylathebest",
-  x: "https://x.com/Geldherrinlay9"
+  tipfunder: "",
+  throne: "",
+  telegram: "",
+  x: ""
 };
+
+// In-Memory Fallback Registry for Unlock / Payment Requests (Step 6 Accept/Reject Queue)
+const inMemoryPaymentRequests: any[] = [];
+
+// GET /api/site-settings
+app.get("/api/site-settings", async (_req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "central_site_settings")
+        .maybeSingle();
+
+      if (data && data.value) {
+        centralSiteSettingsState = { ...centralSiteSettingsState, ...data.value };
+      }
+    } catch (e) {}
+  }
+  res.json(centralSiteSettingsState);
+});
+
+// POST /api/site-settings
+app.post("/api/site-settings", async (req, res) => {
+  try {
+    const {
+      throne_link,
+      twitter_link,
+      telegram_link,
+      tipfunder_link,
+      creator_name,
+      about_text,
+      avatar_url,
+      about_photos,
+      throne,
+      x,
+      telegram,
+      tipfunder,
+      name,
+      bio,
+      avatar,
+      gallery
+    } = req.body || {};
+
+    const updated = {
+      throne_link: throne_link || throne || centralSiteSettingsState.throne_link,
+      twitter_link: twitter_link || x || centralSiteSettingsState.twitter_link,
+      telegram_link: telegram_link || telegram || centralSiteSettingsState.telegram_link,
+      tipfunder_link: tipfunder_link || tipfunder || centralSiteSettingsState.tipfunder_link,
+      creator_name: creator_name || name || centralSiteSettingsState.creator_name,
+      about_text: about_text !== undefined ? about_text : (bio !== undefined ? bio : centralSiteSettingsState.about_text),
+      avatar_url: avatar_url || avatar || centralSiteSettingsState.avatar_url,
+      about_photos: Array.isArray(about_photos) ? about_photos : (Array.isArray(gallery) ? gallery : centralSiteSettingsState.about_photos)
+    };
+
+    centralSiteSettingsState = updated;
+    creatorProfileState = {
+      name: updated.creator_name,
+      avatar: updated.avatar_url,
+      bio: updated.about_text,
+      gallery: updated.about_photos
+    };
+    paymentSettingsState = {
+      throne: updated.throne_link,
+      x: updated.twitter_link,
+      telegram: updated.telegram_link,
+      tipfunder: updated.tipfunder_link
+    };
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("site_settings").upsert([
+          {
+            key: "central_site_settings",
+            value: centralSiteSettingsState,
+            updated_at: new Date().toISOString()
+          },
+          {
+            key: "creator_profile",
+            value: creatorProfileState,
+            updated_at: new Date().toISOString()
+          },
+          {
+            key: "payment_settings",
+            value: paymentSettingsState,
+            updated_at: new Date().toISOString()
+          }
+        ]);
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, settings: centralSiteSettingsState });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/creator-profile
 app.get("/api/creator-profile", async (_req, res) => {
@@ -563,10 +897,11 @@ app.get("/api/creator-profile", async (_req, res) => {
 // POST /api/creator-profile
 app.post("/api/creator-profile", async (req, res) => {
   try {
-    const { name, bio, gallery } = req.body;
+    const { name, bio, gallery, avatar } = req.body;
     creatorProfileState = {
       name: name || creatorProfileState.name,
-      bio: bio || creatorProfileState.bio,
+      avatar: avatar || creatorProfileState.avatar,
+      bio: bio !== undefined ? bio : creatorProfileState.bio,
       gallery: Array.isArray(gallery) && gallery.length > 0 ? gallery : creatorProfileState.gallery
     };
 
@@ -585,6 +920,154 @@ app.post("/api/creator-profile", async (req, res) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/admin/payment-requests - Fetch pending and reviewed unlock requests for Goddess Milana's dashboard
+app.get("/api/admin/payment-requests", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  let requests = [...inMemoryPaymentRequests];
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("payment_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        const map = new Map();
+        for (const item of [...data, ...inMemoryPaymentRequests]) {
+          const key = item.id;
+          if (!map.has(key)) map.set(key, item);
+        }
+        requests = Array.from(map.values());
+      }
+    } catch (e) {
+      console.warn("Error fetching payment_requests from Supabase:", e);
+    }
+  }
+
+  return res.json({ success: true, requests });
+});
+
+// POST /api/payment-requests/submit - Devotee submits proof of payment (Throne/TipFunder) to unlock a video
+app.post("/api/payment-requests/submit", async (req, res) => {
+  try {
+    const { videoId, videoTitle, fanIdentifier, paymentMethod, transactionRef, amount } = req.body || {};
+
+    if (!videoId || !fanIdentifier) {
+      return res.status(400).json({ error: "Video ID and fan identifier are required." });
+    }
+
+    const newRequest = {
+      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      video_id: String(videoId),
+      video_title: videoTitle || "Exclusive Session",
+      fan_identifier: String(fanIdentifier).trim(),
+      payment_method: paymentMethod || "throne",
+      transaction_ref: transactionRef ? String(transactionRef).trim() : "Direct Payment",
+      amount: amount ? String(amount).trim() : "20.00 €",
+      status: "pending",
+      delivery_link: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null
+    };
+
+    inMemoryPaymentRequests.unshift(newRequest);
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("payment_requests").insert(newRequest);
+      } catch (dbErr) {
+        console.warn("Supabase payment_requests insert notice:", dbErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Uw verificatieverzoek is ingediend. Godin Milana zal uw betaling verifiëren en uw toegang ontgrendelen.",
+      request: newRequest
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/payment-requests/:id/action - Goddess Milana Accepts or Rejects the fan's payment
+app.post("/api/admin/payment-requests/:id/action", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { id } = req.params;
+  const { action } = req.body; // 'approve' or 'reject'
+
+  if (!["approve", "reject"].includes(action)) {
+    return res.status(400).json({ error: "Action must be either 'approve' or 'reject'." });
+  }
+
+  const newStatus = action === "approve" ? "approved" : "rejected";
+  const reviewedAt = new Date().toISOString();
+
+  // Find matching request
+  let foundReq = inMemoryPaymentRequests.find((r) => r.id === id);
+  let deliveryLink: string | null = null;
+  let googleDriveUrl: string | null = null;
+
+  if (action === "approve") {
+    // Generate secure access token & delivery link
+    const targetVideoId = foundReq?.video_id || id;
+    const token = `ACCESS-${targetVideoId}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    deliveryLink = `${req.protocol}://${req.get("host") || "localhost:3000"}/#unlock=${token}`;
+
+    const matchingMedia = customUploadedMedia.find(m => m.id === targetVideoId);
+    if (matchingMedia && matchingMedia.googleDriveLink) {
+      googleDriveUrl = matchingMedia.googleDriveLink;
+    }
+
+    verifiedAccessTokens.set(token, {
+      itemId: targetVideoId,
+      timestamp: Date.now()
+    });
+  }
+
+  if (foundReq) {
+    foundReq.status = newStatus;
+    foundReq.reviewed_at = reviewedAt;
+    if (deliveryLink) foundReq.delivery_link = deliveryLink;
+    if (googleDriveUrl) foundReq.google_drive_link = googleDriveUrl;
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from("payment_requests")
+        .update({
+          status: newStatus,
+          reviewed_at: reviewedAt,
+          delivery_link: deliveryLink
+        })
+        .eq("id", id);
+    } catch (e) {
+      console.warn("Supabase update payment_requests error:", e);
+    }
+  }
+
+  return res.json({
+    success: true,
+    status: newStatus,
+    deliveryLink,
+    googleDriveUrl,
+    message: action === "approve" 
+      ? "Asset geautoriseerd. Veilige Google Drive archieflink vrijgegeven." 
+      : "Transactie geweigerd. Toegang ontzegd."
+  });
 });
 
 // GET /api/payment-settings
@@ -634,6 +1117,92 @@ app.post("/api/payment-settings", async (req, res) => {
   }
 });
 
+// GET /api/admin/onboarding-status - Check if Goddess Milana has completed her initial setup tutorial
+app.get("/api/admin/onboarding-status", async (req, res) => {
+  const supabase = getSupabaseServerClient();
+  let isComplete = false;
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "onboarding_completed")
+        .maybeSingle();
+
+      if (data && data.value) {
+        isComplete = Boolean(data.value.completed);
+      }
+    } catch (e) {}
+  }
+  res.json({ completed: isComplete });
+});
+
+// POST /api/admin/onboarding-complete - Mark onboarding tutorial as completed in Supabase site_settings
+app.post("/api/admin/onboarding-complete", async (req, res) => {
+  const supabase = getSupabaseServerClient();
+  if (supabase) {
+    try {
+      await supabase.from("site_settings").upsert({
+        key: "onboarding_completed",
+        value: { completed: true, completed_at: new Date().toISOString() },
+        updated_at: new Date().toISOString()
+      });
+    } catch (e) {}
+  }
+  res.json({ success: true, completed: true });
+});
+
+// POST /api/admin/storage/profile-upload-url - Generate Signed Upload URL for 'profile_images' bucket
+app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { fileName, fileType, fileSize } = req.body || {};
+  if (!fileName) {
+    return res.status(400).json({ error: "fileName is required." });
+  }
+
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+  if (fileSize && Number(fileSize) > MAX_IMAGE_SIZE) {
+    return res.status(400).json({ error: "Image size exceeds 10MB limit." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not initialized." });
+  }
+
+  try {
+    const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `portraits/${Date.now()}_${cleanName}`;
+
+    // Create a Signed Upload URL for 'profile_images' bucket
+    const { data, error } = await supabase.storage.from("profile_images").createSignedUploadUrl(storagePath);
+
+    if (error || !data) {
+      // Fallback: try public URL directly if bucket is public
+      const { data: pubData } = supabase.storage.from("profile_images").getPublicUrl(storagePath);
+      return res.status(500).json({ error: error?.message || "Failed to create signed upload URL." });
+    }
+
+    const { data: pubData } = supabase.storage.from("profile_images").getPublicUrl(storagePath);
+
+    return res.json({
+      success: true,
+      signedUrl: data.signedUrl,
+      token: data.token,
+      path: data.path,
+      storagePath,
+      publicUrl: pubData?.publicUrl || "",
+      bucket: "profile_images"
+    });
+  } catch (err: any) {
+    console.error("[PROFILE IMAGE STORAGE ERROR]:", err);
+    return res.status(500).json({ error: err.message || "Internal server error." });
+  }
+});
+
 // POST /api/custom-media/delete (Soft-delete: hide from public feed, preserve in backend DB)
 app.post("/api/custom-media/delete", async (req, res) => {
   try {
@@ -654,6 +1223,39 @@ app.post("/api/custom-media/delete", async (req, res) => {
     }
 
     return res.json({ success: true, hiddenVideoIds: Array.from(softDeletedVideoIds) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/cleanup-legacy (Clean/hide legacy demo content from feed)
+app.post("/api/admin/cleanup-legacy", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  try {
+    const supabase = getSupabaseServerClient();
+    const demoVideoIds = ["1", "2", "3", "4", "5", "6", "7", "8", "demo-1", "demo-2", "sample-1", "sample-2"];
+    
+    demoVideoIds.forEach(id => softDeletedVideoIds.add(id));
+
+    if (supabase) {
+      for (const id of demoVideoIds) {
+        try {
+          await supabase.from("soft_deleted_videos").upsert({
+            video_id: id,
+            deleted_at: new Date().toISOString()
+          });
+        } catch (e) {}
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Verouderde democontent is succesvol opgeruimd en verborgen voor bezoekers.",
+      hiddenVideoIds: Array.from(softDeletedVideoIds)
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -694,17 +1296,17 @@ app.get("/api/custom-media", async (_req, res) => {
           id: row.id || `db-${Date.now()}`,
           title: row.title || "Untitled Session",
           titleEn: row.title || "Untitled Session",
-          category: row.category || "Goddess Exclusive",
-          categoryEn: row.category || "Goddess Exclusive",
+          category: row.category || "Queen Exclusive",
+          categoryEn: row.category || "Queen Exclusive",
           price: parseFloat(row.price) || 20.00,
-          previewUrl: row.google_drive_link || row.video_url || "https://i.imgur.com/m0CSW44.mp4",
-          videoUrl: row.google_drive_link || row.video_url || "https://i.imgur.com/m0CSW44.mp4",
+          previewUrl: row.google_drive_link || row.video_url || "",
+          videoUrl: row.google_drive_link || row.video_url || "",
           googleDriveLink: row.google_drive_link || row.video_url || "",
-          thumbnailUrl: row.thumbnail_url || "https://i.imgur.com/g5fQwuf.jpg",
+          thumbnailUrl: row.thumbnail_url || "",
           duration: "Full length",
-          description: row.description || "Exclusive session published by Goddess Layla.",
-          descriptionEn: row.description || "Exclusive session published by Goddess Layla.",
-          tags: Array.isArray(row.tags) ? row.tags : ["goddesslayla", "exclusive"],
+          description: row.description || "Exclusive session published by Goddess Milana.",
+          descriptionEn: row.description || "Exclusive session published by Goddess Milana.",
+          tags: Array.isArray(row.tags) ? row.tags : ["goddessmilana", "exclusive"],
           createdAt: row.created_at
         }));
       }
@@ -731,30 +1333,360 @@ app.get("/api/custom-media", async (_req, res) => {
   });
 });
 
+// Storage & Video Processing Helpers
+async function triggerGitHubVideoProcessing(submission: {
+  id: string;
+  title: string;
+  price?: string | number;
+  video_storage_path: string;
+  createdAt?: string;
+}): Promise<{ dispatched: boolean; status?: number; error?: string; signedUrl?: string }> {
+  const supabase = getSupabaseServerClient();
+  if (!supabase || !submission.video_storage_path) {
+    return { dispatched: false, error: "Supabase or video storage path missing." };
+  }
+
+  try {
+    // Generate temporary 1-hour Signed Download URL for GitHub Action runner
+    const { data: signedData, error: signErr } = await supabase
+      .storage
+      .from("premium_videos")
+      .createSignedUrl(submission.video_storage_path, 3600);
+
+    if (signErr || !signedData?.signedUrl) {
+      console.warn("[STORAGE] Failed to generate signed download URL for GitHub Action:", signErr);
+      return { dispatched: false, error: signErr?.message || "Failed to create signed URL" };
+    }
+
+    const githubToken = process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO; // e.g. "owner/repository"
+
+    if (!githubToken || !githubRepo) {
+      console.log("[GITHUB ACTION] GITHUB_TOKEN or GITHUB_REPO not configured in environment. Signed URL generated:", signedData.signedUrl);
+      return {
+        dispatched: false,
+        signedUrl: signedData.signedUrl,
+        error: "GITHUB_TOKEN or GITHUB_REPO not configured in .env"
+      };
+    }
+
+    const ghRes = await fetch(`https://api.github.com/repos/${githubRepo}/dispatches`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${githubToken}`,
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+        "User-Agent": "Queen-Milana-Studio"
+      },
+      body: JSON.stringify({
+        event_type: "process_video",
+        client_payload: {
+          submission_id: submission.id,
+          video_storage_path: submission.video_storage_path,
+          video_download_url: signedData.signedUrl,
+          title: submission.title,
+          price: String(submission.price || "25.00"),
+          created_at: submission.createdAt || new Date().toISOString()
+        }
+      })
+    });
+
+    if (ghRes.ok) {
+      console.log(`[GITHUB ACTION] Successfully triggered process_video workflow for submission ${submission.id}`);
+      return { dispatched: true, status: ghRes.status, signedUrl: signedData.signedUrl };
+    } else {
+      const errBody = await ghRes.text().catch(() => "");
+      console.warn(`[GITHUB ACTION ERROR] Status ${ghRes.status}: ${errBody}`);
+      return { dispatched: false, status: ghRes.status, error: `GitHub API error: ${ghRes.status} ${errBody}` };
+    }
+  } catch (err: any) {
+    console.error("[GITHUB ACTION ERROR] Exception:", err);
+    return { dispatched: false, error: err.message };
+  }
+}
+
+// POST /api/admin/storage/upload-url - Generate Signed Upload URL for client-side direct upload
+app.post("/api/admin/storage/upload-url", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { fileName, fileType, fileSize } = req.body || {};
+
+  if (!fileName) {
+    return res.status(400).json({ error: "fileName is required." });
+  }
+
+  // Pre-flight 60MB file size limit check
+  const MAX_FILE_SIZE = 60 * 1024 * 1024; // 60MB
+  if (fileSize && Number(fileSize) > MAX_FILE_SIZE) {
+    return res.status(400).json({
+      error: `File size exceeds the 60MB limit (${(Number(fileSize) / (1024 * 1024)).toFixed(1)}MB). Please compress your video before uploading.`
+    });
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase service client is not initialized. Please verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." });
+  }
+
+  try {
+    // Sanitize filename & generate clean storage path inside 'raw/' directory of 'premium_videos' bucket
+    const cleanName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `raw/${Date.now()}_${cleanName}`;
+
+    // Create a Signed Upload URL using the Service Role Key
+    const { data, error } = await supabase.storage.from("premium_videos").createSignedUploadUrl(storagePath);
+
+    if (error || !data) {
+      console.error("[SUPABASE STORAGE] createSignedUploadUrl error:", error);
+      return res.status(500).json({ error: error?.message || "Failed to create signed upload URL." });
+    }
+
+    return res.json({
+      success: true,
+      signedUrl: data.signedUrl,
+      token: data.token,
+      path: data.path,
+      storagePath,
+      bucket: "premium_videos"
+    });
+  } catch (err: any) {
+    console.error("[SUPABASE STORAGE] Error creating upload URL:", err);
+    return res.status(500).json({ error: err.message || "Internal server error creating upload URL" });
+  }
+});
+
+// GET /api/admin/storage-usage - Storage Usage Gauge calculation for 'premium_videos' bucket
+app.get("/api/admin/storage-usage", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not initialized." });
+  }
+
+  let totalBytes = 0;
+  let fileCount = 0;
+  const recentFiles: any[] = [];
+
+  try {
+    // Query storage.objects directly via Postgres service role
+    const { data: objects, error: objError } = await supabase
+      .schema("storage")
+      .from("objects")
+      .select("id, name, metadata, created_at, bucket_id")
+      .eq("bucket_id", "premium_videos")
+      .order("created_at", { ascending: false });
+
+    if (!objError && objects && Array.isArray(objects)) {
+      fileCount = objects.length;
+      objects.forEach((obj: any) => {
+        const size = Number(obj.metadata?.size || obj.metadata?.contentLength || 0);
+        totalBytes += size;
+        recentFiles.push({
+          id: obj.id,
+          name: obj.name,
+          size,
+          sizeMB: Number((size / (1024 * 1024)).toFixed(2)),
+          createdAt: obj.created_at
+        });
+      });
+    } else {
+      // Fallback: list files via Supabase Storage API
+      const { data: rawFiles } = await supabase.storage.from("premium_videos").list("raw", { limit: 1000 });
+      const { data: rootFiles } = await supabase.storage.from("premium_videos").list("", { limit: 1000 });
+      const allFiles = [...(rawFiles || []).map(f => ({ ...f, name: `raw/${f.name}` })), ...(rootFiles || []).filter(f => f.name !== "raw")];
+
+      fileCount = allFiles.length;
+      allFiles.forEach((file: any) => {
+        const size = Number(file.metadata?.size || 0);
+        totalBytes += size;
+        recentFiles.push({
+          id: file.id || file.name,
+          name: file.name,
+          size,
+          sizeMB: Number((size / (1024 * 1024)).toFixed(2)),
+          createdAt: file.created_at
+        });
+      });
+    }
+  } catch (err: any) {
+    console.warn("[STORAGE USAGE WARNING]:", err);
+  }
+
+  const MAX_FREE_TIER_MB = 1000; // 1000 MB (1GB free tier limit)
+  const usedMB = Number((totalBytes / (1024 * 1024)).toFixed(1));
+  const percentage = Math.min(100, Math.round((usedMB / MAX_FREE_TIER_MB) * 100));
+  const isNearLimit = usedMB >= 900; // Warning threshold at 900MB
+
+  return res.json({
+    success: true,
+    totalBytes,
+    usedMB,
+    maxMB: MAX_FREE_TIER_MB,
+    percentage,
+    isNearLimit,
+    warning: isNearLimit ? "Storage is approaching the 1GB free tier limit (>900MB used). Please delete older raw videos to prevent upload failures." : null,
+    fileCount,
+    recentFiles: recentFiles.slice(0, 15)
+  });
+});
+
+// POST /api/admin/trigger-github-action - Manually dispatch GitHub Action video processing
+app.post("/api/admin/trigger-github-action", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { submissionId, videoStoragePath, title, price } = req.body || {};
+
+  if (!videoStoragePath) {
+    return res.status(400).json({ error: "videoStoragePath is required." });
+  }
+
+  const result = await triggerGitHubVideoProcessing({
+    id: submissionId || `sub-${Date.now()}`,
+    title: title || "Exclusive Video",
+    price: price || "25.00",
+    video_storage_path: videoStoragePath
+  });
+
+  return res.json({
+    success: result.dispatched,
+    result
+  });
+});
+
+// POST /api/admin/generate-delivery-link/:id - Admin approves Throne/Fan payment and generates 24-hour Signed Download URL
+app.post("/api/admin/generate-delivery-link/:id", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { id } = req.params;
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not initialized." });
+  }
+
+  try {
+    // Look up submission by id
+    let storagePath: string | null = null;
+    let title: string = "Exclusive Video";
+
+    const { data: submission } = await supabase
+      .from("content_submissions")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (submission) {
+      storagePath = submission.video_storage_path;
+      title = submission.title;
+    } else {
+      const match = customUploadedMedia.find((m) => m.id === id || m.video_storage_path);
+      if (match) {
+        storagePath = match.video_storage_path || match.videoStoragePath;
+        title = match.title;
+      }
+    }
+
+    if (!storagePath) {
+      return res.status(404).json({ error: "Video storage path not found for this submission." });
+    }
+
+    // Generate 24-hour (86,400 seconds) Signed Download URL
+    const { data: signedData, error: signErr } = await supabase
+      .storage
+      .from("premium_videos")
+      .createSignedUrl(storagePath, 86400);
+
+    if (signErr || !signedData?.signedUrl) {
+      return res.status(500).json({ error: signErr?.message || "Failed to generate signed download URL." });
+    }
+
+    const expiresAt = new Date(Date.now() + 86400 * 1000).toISOString();
+    const fanIdentifier = req.body?.fanIdentifier || "VIP Fan";
+
+    // Log to access_grants table in Supabase
+    try {
+      const { error: grantDbErr } = await supabase.from("access_grants").insert({
+        video_id: id,
+        video_title: title,
+        fan_identifier: fanIdentifier,
+        link_reference: signedData.signedUrl,
+        generated_at: new Date().toISOString(),
+        expires_at: expiresAt
+      });
+
+      if (grantDbErr) {
+        console.warn("[ACCESS GRANT WARNING] Failed to insert into access_grants table:", grantDbErr.message);
+      } else {
+        console.log(`[ACCESS GRANT] Successfully logged delivery link for video "${title}" (fan: ${fanIdentifier})`);
+      }
+    } catch (grantErr: any) {
+      console.warn("[ACCESS GRANT WARNING] Exception logging to access_grants table:", grantErr.message);
+    }
+
+    return res.json({
+      success: true,
+      title,
+      storagePath,
+      downloadUrl: signedData.signedUrl,
+      streamUrl: signedData.signedUrl,
+      expiresInHours: 24,
+      expiresAt,
+      fanIdentifier
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/custom-media", async (req, res) => {
   try {
-    const { passcode, title, category, price, previewUrl, videoUrl, googleDriveLink, thumbnailUrl, duration, description, tags } = req.body;
+    const {
+      passcode,
+      title,
+      category,
+      price,
+      previewUrl,
+      videoUrl,
+      googleDriveLink,
+      video_storage_path,
+      videoStoragePath,
+      thumbnailUrl,
+      duration,
+      description,
+      tags
+    } = req.body;
 
-    const finalVideoUrl = googleDriveLink || videoUrl || previewUrl;
-    if (!title || !finalVideoUrl) {
-      return res.status(400).json({ error: "Title and video source URL are required." });
+    const storagePath = video_storage_path || videoStoragePath;
+    const finalVideoUrl = googleDriveLink || videoUrl || previewUrl || (storagePath ? `supabase://${storagePath}` : "");
+    if (!title || (!finalVideoUrl && !storagePath)) {
+      return res.status(400).json({ error: "Title and video source or storage path are required." });
     }
 
     const newItem = {
       id: `custom-vid-${Date.now()}`,
       title: title.trim(),
       titleEn: title.trim(),
-      category: category ? category.trim() : "Goddess Exclusive",
-      categoryEn: category ? category.trim() : "Goddess Exclusive",
+      category: category ? category.trim() : "Queen Exclusive",
+      categoryEn: category ? category.trim() : "Queen Exclusive",
       price: parseFloat(price) || 20.00,
-      previewUrl: finalVideoUrl.trim(),
-      videoUrl: finalVideoUrl.trim(),
-      googleDriveLink: finalVideoUrl.trim(),
+      previewUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
+      videoUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
+      googleDriveLink: googleDriveLink || "",
+      video_storage_path: storagePath || null,
+      videoStoragePath: storagePath || null,
       thumbnailUrl: thumbnailUrl || "https://i.imgur.com/g5fQwuf.jpg",
       duration: duration || "Full length",
-      description: description || "Exclusive video published by Goddess Layla.",
-      descriptionEn: description || "Exclusive video published by Goddess Layla.",
-      tags: Array.isArray(tags) ? tags : ["new", "goddesslayla", "exclusive"],
+      description: description || "Exclusive video published by Queen Milana.",
+      descriptionEn: description || "Exclusive video published by Queen Milana.",
+      tags: Array.isArray(tags) ? tags : ["new", "queenmilana", "exclusive"],
       createdAt: new Date().toISOString()
     };
 
@@ -762,6 +1694,7 @@ app.post("/api/custom-media", async (req, res) => {
 
     // Save directly to Supabase
     let supabaseResult = { saved: false, message: "Supabase client not configured" };
+    let githubActionResult: any = null;
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
@@ -769,14 +1702,15 @@ app.post("/api/custom-media", async (req, res) => {
           title: newItem.title,
           price: String(newItem.price),
           tags: newItem.tags,
-          google_drive_link: newItem.videoUrl,
+          video_storage_path: newItem.video_storage_path,
+          google_drive_link: newItem.googleDriveLink || null,
           thumbnail_url: newItem.thumbnailUrl,
           category: newItem.category,
-          name: "Goddess Layla",
+          name: "Queen Milana",
           description: newItem.description,
           status: "published",
           created_at: newItem.createdAt
-        }).select('*');
+        }).select("*");
 
         if (error) {
           console.warn("Supabase content_submissions insert warning:", error);
@@ -809,13 +1743,25 @@ app.post("/api/custom-media", async (req, res) => {
       } catch (sErr) {
         console.warn("Supabase custom_media_list upsert error:", sErr);
       }
+
+      // If video was uploaded directly to Supabase Storage, trigger GitHub Action processing
+      if (newItem.video_storage_path) {
+        githubActionResult = await triggerGitHubVideoProcessing({
+          id: newItem.id,
+          title: newItem.title,
+          price: newItem.price,
+          video_storage_path: newItem.video_storage_path,
+          createdAt: newItem.createdAt
+        });
+      }
     }
 
     return res.json({
       success: true,
       item: newItem,
       items: customUploadedMedia,
-      supabaseResult
+      supabaseResult,
+      githubActionResult
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -824,9 +1770,10 @@ app.post("/api/custom-media", async (req, res) => {
 
 // Payment & VIP Code Verification Endpoint
 const VALID_VIP_PASSCODES = new Set([
-  "LAYLA2026",
+  "MILANA2026",
+  "QUEEN-VIP",
   "GODDESS-VIP",
-  "INAYA2026",
+  "SANCTUARY-VIP",
   "REINE-VIP",
   "DOMINION-VIP",
   "PAID2026",
@@ -834,9 +1781,9 @@ const VALID_VIP_PASSCODES = new Set([
 ]);
 
 // Server-stored verified transactions token registry
-const verifiedAccessTokens = new Map<string, { itemId: string; timestamp: number }>();
+const verifiedAccessTokens = new Map<string, { itemId: string; timestamp: number; downloadUrl?: string }>();
 
-app.post("/api/verify-payment", (req, res) => {
+app.post("/api/verify-payment", async (req, res) => {
   try {
     const { itemId, paymentMethod, transactionRef } = req.body;
 
@@ -857,18 +1804,51 @@ app.post("/api/verify-payment", (req, res) => {
 
     if (isValidPasscode || isValidTxnFormat) {
       const token = `ACCESS-${itemId}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-      verifiedAccessTokens.set(token, { itemId, timestamp: Date.now() });
+      
+      // Look up if this item has a Supabase Storage path to generate 24-hour signed download URL
+      let downloadUrl: string | null = null;
+      const supabase = getSupabaseServerClient();
+      if (supabase) {
+        try {
+          // Check content_submissions
+          const { data: sub } = await supabase
+            .from("content_submissions")
+            .select("video_storage_path")
+            .eq("id", itemId)
+            .maybeSingle();
+
+          const storagePath = sub?.video_storage_path || customUploadedMedia.find(m => m.id === itemId)?.video_storage_path;
+
+          if (storagePath) {
+            const { data: signedData } = await supabase
+              .storage
+              .from("premium_videos")
+              .createSignedUrl(storagePath, 86400); // 24 hours
+
+            if (signedData?.signedUrl) {
+              downloadUrl = signedData.signedUrl;
+            }
+          }
+        } catch (storageErr) {
+          console.warn("[PAYMENT VERIFICATION] Storage sign warning:", storageErr);
+        }
+      }
+
+      verifiedAccessTokens.set(token, { itemId, timestamp: Date.now(), downloadUrl: downloadUrl || undefined });
 
       return res.json({
         verified: true,
         accessToken: token,
-        message: "Payment successfully verified! Full access granted.",
+        downloadUrl,
+        streamUrl: downloadUrl,
+        expiresInHours: 24,
+        message: "Payment successfully verified! Your 24-hour secure delivery link is active.",
         method: paymentMethod || "manual_ref"
       });
     } else {
       return res.status(422).json({
         verified: false,
-        message: "Invalid transaction reference or passcode. Please check your payment receipt or enter a valid VIP passcode (e.g., INAYA2026)."
+        message: "Invalid transaction reference or passcode. Please check your payment receipt or enter a valid VIP passcode (e.g., MILANA2026)."
       });
     }
   } catch (error: any) {
@@ -912,7 +1892,7 @@ app.post("/api/content-submissions", async (req, res) => {
       price: price ? String(price).trim() : "20.00",
       tags: formattedTags,
       googleDriveLink: googleDriveLink.trim(),
-      name: name ? name.trim() : "Goddess Layla",
+      name: name ? name.trim() : "Queen Milana",
       description: description ? description.trim() : "",
       createdAt: new Date().toISOString(),
       status: "pending_processing"

@@ -1,21 +1,18 @@
 import React from 'react';
-import { SOCIAL_LINKS } from '../data/collectionData';
-import { Send, Gift, Crown } from 'lucide-react';
+import { Send, Gift } from 'lucide-react';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface FooterProps {
   lang?: 'fr' | 'en';
-  onOpenAdmin?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
-  const handlePortalClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (onOpenAdmin) {
-      onOpenAdmin();
-    } else {
-      window.location.hash = '#admin';
-    }
-  };
+export const Footer: React.FC<FooterProps> = () => {
+  const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
+  const throneLink = siteSettings.throne_link || paymentSettings.throne;
+  const xLink = siteSettings.twitter_link || paymentSettings.x;
+  const telegramLink = siteSettings.telegram_link || paymentSettings.telegram;
 
   return (
     <footer className="bg-white border-t border-gray-200/80 py-12 px-4 sm:px-6 lg:px-8 mt-12 font-sans">
@@ -27,49 +24,57 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
           {/* Brand */}
           <div className="flex flex-col items-center md:items-start space-y-1 text-center md:text-left">
             <div className="font-serif text-2xl font-bold tracking-tight text-black">
-              Goddess Layla
+              {creatorName}
             </div>
             <p className="text-xs text-gray-700 font-medium mt-0.5">
-              Telegram: laylathebest • VIP Sanctuary
+              Official VIP Sanctuary • All Rights Reserved
             </p>
           </div>
 
           {/* Official Links */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs font-bold text-black">
-            <a
-              href={SOCIAL_LINKS.tipfunder}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:bg-gray-800 transition-colors bg-black text-white px-4 py-2 rounded-full border border-black"
-            >
-              <span>TipFunder Payment</span>
-            </a>
-            <a
-              href={SOCIAL_LINKS.throne}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:bg-gray-200 transition-colors bg-gray-100 text-black px-4 py-2 rounded-full border border-gray-200 flex items-center gap-1"
-            >
-              <Gift className="w-3.5 h-3.5 text-black" />
-              <span>Throne</span>
-            </a>
-            <a
-              href={SOCIAL_LINKS.x}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:bg-gray-200 transition-colors bg-gray-100 text-black px-4 py-2 rounded-full border border-gray-200"
-            >
-              <span>X @Geldherrinlay9</span>
-            </a>
-            <a
-              href={SOCIAL_LINKS.telegram}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:bg-sky-700 transition-colors bg-sky-600 text-white px-4 py-2 rounded-full border border-sky-600 flex items-center gap-1"
-            >
-              <Send className="w-3.5 h-3.5 text-white" />
-              <span>Telegram</span>
-            </a>
+            {throneLink && (
+              <a
+                href={throneLink}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:bg-gray-800 transition-colors bg-black text-white px-4 py-2 rounded-full border border-black flex items-center gap-1"
+              >
+                <Gift className="w-3.5 h-3.5 text-white" />
+                <span>Throne</span>
+              </a>
+            )}
+            {tipfunderLink && (
+              <a
+                href={tipfunderLink}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:bg-gray-200 transition-colors bg-gray-100 text-black px-4 py-2 rounded-full border border-gray-200 flex items-center gap-1"
+              >
+                <span>TipFunder Tribute</span>
+              </a>
+            )}
+            {xLink && (
+              <a
+                href={xLink}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:bg-gray-200 transition-colors bg-gray-100 text-black px-4 py-2 rounded-full border border-gray-200"
+              >
+                <span>X (Twitter)</span>
+              </a>
+            )}
+            {telegramLink && (
+              <a
+                href={telegramLink}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:bg-gray-800 transition-colors bg-black text-white px-4 py-2 rounded-full border border-black flex items-center gap-1"
+              >
+                <Send className="w-3.5 h-3.5 text-white" />
+                <span>Telegram</span>
+              </a>
+            )}
           </div>
 
         </div>
@@ -81,32 +86,23 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
               18+ LEGAL NOTICE
             </span>
             <span className="text-xs font-bold text-black uppercase tracking-wider">
-              Regulatory Compliance Disclaimer
+              Legal Compliance & Privacy
             </span>
           </div>
           <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed font-normal">
-            This website and its exclusive digital content are strictly intended for adults 18 years of age and older. By continuing to access this service, you certify under penalty of perjury that you are of legal age in your jurisdiction. All media, video broadcasts, and trademarks are protected under international copyright and intellectual property laws.
+            This website and exclusive digital archives are strictly intended for adults aged 18 and older. By accessing this platform, you certify that you are of legal age in your jurisdiction. All media, video transactions, and trademarks are protected under international copyright and intellectual property laws.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
           <div className="select-none cursor-default">
-            © {new Date().getFullYear()} Goddess Layla. All rights reserved. VIP Space 18+.
+            © {new Date().getFullYear()} {creatorName}. All rights reserved. VIP 18+.
           </div>
-
-          {/* Goddess Layla Portal Link */}
-          <a
-            href="/admin"
-            onClick={handlePortalClick}
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 hover:text-black transition-all py-1 px-3 rounded-full border border-gray-200 hover:border-black bg-white hover:bg-gray-50 shadow-2xs cursor-pointer group"
-            title="Goddess Layla Sanctuary Portal"
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
-            <span>Goddess Layla Portal</span>
-          </a>
         </div>
 
       </div>
     </footer>
   );
 };
+
+export default Footer;

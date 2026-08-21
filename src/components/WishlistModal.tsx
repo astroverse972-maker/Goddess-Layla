@@ -35,9 +35,9 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({ isOpen, onClose })
         <div className="p-6 sm:p-8 space-y-6">
           
           <div className="text-center space-y-1">
-            <h4 className="font-serif text-2xl font-extrabold text-gray-900">Goddess Layla</h4>
+            <h4 className="font-serif text-2xl font-extrabold text-gray-900">Goddess Milana</h4>
             <p className="text-xs text-gray-500 font-medium">
-              Send gifts and tributes directly to Goddess Layla.
+              Send gifts and tributes directly to Goddess Milana.
             </p>
           </div>
 

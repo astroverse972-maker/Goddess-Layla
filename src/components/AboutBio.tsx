@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, ChevronLeft, ChevronRight, Gift, Send } from 'lucide-react';
-import { SOCIAL_LINKS, GALLERY_SLIDES } from '../data/collectionData';
+import { ExternalLink, ChevronLeft, ChevronRight, Gift, Send, Crown, CreditCard } from 'lucide-react';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface AboutBioProps {
   lang?: 'fr' | 'en';
@@ -8,100 +8,38 @@ interface AboutBioProps {
 
 export const AboutBio: React.FC<AboutBioProps> = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
 
-  // Dynamic Profile & Payment Settings
-  const [profile, setProfile] = useState({
-    name: 'Goddess Layla',
-    bio: 'Welcome to my official VIP sanctuary. Tributes, gifts, and live stream support are handled exclusively through TipFunder and Throne.',
-    gallery: GALLERY_SLIDES
-  });
-
-  const [paymentLinks, setPaymentLinks] = useState({
-    tipfunder: SOCIAL_LINKS.tipfunder,
-    throne: SOCIAL_LINKS.throne,
-    x: SOCIAL_LINKS.x,
-    telegram: SOCIAL_LINKS.telegram
-  });
-
-  const loadLocalSettings = () => {
-    // Fetch real-time settings from server first
-    fetch('/api/creator-profile')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((parsed) => {
-        if (parsed) {
-          setProfile((prev) => ({
-            name: parsed.name || prev.name,
-            bio: parsed.bio || prev.bio,
-            gallery: Array.isArray(parsed.gallery) && parsed.gallery.length > 0 ? parsed.gallery : prev.gallery
-          }));
-        }
-      })
-      .catch(() => {});
-
-    fetch('/api/payment-settings')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((parsed) => {
-        if (parsed) {
-          setPaymentLinks((prev) => ({
-            tipfunder: parsed.tipfunder || prev.tipfunder,
-            throne: parsed.throne || prev.throne,
-            x: parsed.x || prev.x,
-            telegram: parsed.telegram || prev.telegram
-          }));
-        }
-      })
-      .catch(() => {});
-
-    try {
-      const savedProfile = localStorage.getItem('goddess_creator_profile');
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile);
-        setProfile((prev) => ({
-          name: parsed.name || prev.name,
-          bio: parsed.bio || prev.bio,
-          gallery: Array.isArray(parsed.gallery) && parsed.gallery.length > 0 ? parsed.gallery : prev.gallery
-        }));
-      }
-
-      const savedLinks = localStorage.getItem('goddess_payment_settings');
-      if (savedLinks) {
-        const parsed = JSON.parse(savedLinks);
-        setPaymentLinks((prev) => ({
-          tipfunder: parsed.tipfunder || prev.tipfunder,
-          throne: parsed.throne || prev.throne,
-          x: parsed.x || prev.x,
-          telegram: parsed.telegram || prev.telegram
-        }));
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    loadLocalSettings();
-    window.addEventListener('storage', loadLocalSettings);
-    const interval = setInterval(loadLocalSettings, 3000);
-    return () => {
-      window.removeEventListener('storage', loadLocalSettings);
-      clearInterval(interval);
-    };
-  }, []);
-
-  const gallerySlides = profile.gallery && profile.gallery.length > 0 ? profile.gallery : GALLERY_SLIDES;
+  const gallerySlides = Array.isArray(siteSettings.about_photos) && siteSettings.about_photos.length > 0
+    ? siteSettings.about_photos.filter(Boolean)
+    : (Array.isArray(creatorProfile.gallery) ? creatorProfile.gallery.filter(Boolean) : []);
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % gallerySlides.length);
+    if (gallerySlides.length > 0) {
+      setCurrentSlide((prev) => (prev + 1) % gallerySlides.length);
+    }
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + gallerySlides.length) % gallerySlides.length);
+    if (gallerySlides.length > 0) {
+      setCurrentSlide((prev) => (prev - 1 + gallerySlides.length) % gallerySlides.length);
+    }
   };
 
   useEffect(() => {
+    if (gallerySlides.length <= 1) return;
     const timer = setInterval(() => {
       nextSlide();
     }, 4500);
     return () => clearInterval(timer);
   }, [gallerySlides.length]);
+
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const bioText = siteSettings.about_text || creatorProfile.bio || 'Welcome to the official VIP sanctuary of Queen Milana. Exclusive archives, custom commissions, and private live stream authorizations through centralized secure channels.';
+  const throneLink = siteSettings.throne_link || paymentSettings.throne;
+  const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
+  const xLink = siteSettings.twitter_link || paymentSettings.x;
+  const telegramLink = siteSettings.telegram_link || paymentSettings.telegram;
 
   return (
     <section id="about" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 border-t border-gray-200/80 font-sans">
@@ -113,18 +51,18 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
           
           <div className="space-y-1.5">
             <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-black bg-gray-100 px-3 py-1 rounded-full border border-gray-200 inline-block">
-              About Me
+              About
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-black tracking-tight leading-tight">
-              {profile.name}
+              {creatorName}
             </h2>
-            {paymentLinks.telegram && (
+            {telegramLink && (
               <div className="flex items-center gap-2 text-sm sm:text-base text-gray-800 font-semibold">
-                <Send className="w-4 h-4 text-sky-600" />
+                <Send className="w-4 h-4 text-black" />
                 <span>
                   Telegram:{' '}
-                  <a href={paymentLinks.telegram} target="_blank" rel="noreferrer" className="underline hover:text-sky-600">
-                    {paymentLinks.telegram.split('/').pop() || 'laylathebest'}
+                  <a href={telegramLink} target="_blank" rel="noreferrer" className="underline hover:text-black">
+                    VIP Sanctuary
                   </a>
                 </span>
               </div>
@@ -135,165 +73,149 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
           <div className="p-4 sm:p-6 bg-gray-50/90 text-black rounded-2xl sm:rounded-3xl border border-gray-200/80 space-y-3 shadow-xs">
             
             <div className="text-sm sm:text-base font-bold tracking-tight text-black flex items-center gap-2">
-              <span>Official Creator Sanctuary</span>
+              <span>Official VIP Sanctuary</span>
             </div>
 
             <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-medium whitespace-pre-line">
-              {profile.bio}
+              {bioText}
             </p>
 
-            <div className="pt-2 border-t border-gray-200/80 text-xs text-gray-800 space-y-1">
-              <p className="font-bold text-black">
-                Official Channels & Platforms:
-              </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-0.5 text-xs">
-                {paymentLinks.tipfunder && (
-                  <li>
-                    TipFunder:{' '}
-                    <a href={paymentLinks.tipfunder} target="_blank" rel="noreferrer" className="underline font-semibold">
-                      TipFunder
-                    </a>
-                  </li>
-                )}
-                {paymentLinks.throne && (
-                  <li>
-                    Throne Wishlist:{' '}
-                    <a href={paymentLinks.throne} target="_blank" rel="noreferrer" className="underline font-semibold">
-                      Throne Wishlist
-                    </a>
-                  </li>
-                )}
-                {paymentLinks.x && (
-                  <li>
-                    X (Twitter):{' '}
-                    <a href={paymentLinks.x} target="_blank" rel="noreferrer" className="underline font-semibold">
-                      Official X Profile
-                    </a>
-                  </li>
-                )}
-                {paymentLinks.telegram && (
-                  <li>
-                    Telegram:{' '}
-                    <a href={paymentLinks.telegram} target="_blank" rel="noreferrer" className="underline font-semibold">
-                      Official Telegram Channel
-                    </a>
-                  </li>
-                )}
-              </ul>
-            </div>
+            {(tipfunderLink || throneLink || xLink || telegramLink) && (
+              <div className="pt-2 border-t border-gray-200/80 text-xs text-gray-800 space-y-1">
+                <p className="font-bold text-black">
+                  Official Channels & Platforms:
+                </p>
+                <ul className="list-disc list-inside text-gray-700 space-y-0.5 text-xs">
+                  {throneLink && (
+                    <li>
+                      Throne:{' '}
+                      <a href={throneLink} target="_blank" rel="noreferrer" className="underline font-semibold">
+                        Official Wishlist & Direct Tribute
+                      </a>
+                    </li>
+                  )}
+                  {tipfunderLink && (
+                    <li>
+                      TipFunder:{' '}
+                      <a href={tipfunderLink} target="_blank" rel="noreferrer" className="underline font-semibold">
+                        TipFunder Tribute Portal
+                      </a>
+                    </li>
+                  )}
+                  {xLink && (
+                    <li>
+                      X (Twitter):{' '}
+                      <a href={xLink} target="_blank" rel="noreferrer" className="underline font-semibold">
+                        Official X Profile
+                      </a>
+                    </li>
+                  )}
+                  {telegramLink && (
+                    <li>
+                      Telegram:{' '}
+                      <a href={telegramLink} target="_blank" rel="noreferrer" className="underline font-semibold">
+                        Official VIP Telegram Channel
+                      </a>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
 
           </div>
 
           {/* Official Action Buttons */}
           <div className="pt-1 flex flex-wrap items-center gap-2">
-            {paymentLinks.tipfunder && (
+            {throneLink && (
               <a
-                href={paymentLinks.tipfunder}
+                href={throneLink}
                 target="_blank"
                 rel="noreferrer"
                 className="px-4 py-2.5 rounded-full bg-black text-white hover:bg-gray-800 font-bold text-xs transition-transform active:scale-95 flex items-center gap-1.5 shadow-xs"
               >
-                <span>TipFunder Payment</span>
+                <Gift className="w-3.5 h-3.5 text-white" />
+                <span>Throne Wishlist</span>
                 <ExternalLink className="w-3.5 h-3.5 text-white" />
               </a>
             )}
 
-            {paymentLinks.throne && (
+            {tipfunderLink && (
               <a
-                href={paymentLinks.throne}
+                href={tipfunderLink}
                 target="_blank"
                 rel="noreferrer"
                 className="px-4 py-2.5 rounded-full bg-gray-100 text-black border border-gray-300 hover:bg-gray-200 font-bold text-xs transition-transform active:scale-95 flex items-center gap-1.5 shadow-xs"
               >
-                <Gift className="w-3.5 h-3.5 text-black" />
-                <span>Throne Wishlist</span>
+                <CreditCard className="w-3.5 h-3.5 text-black" />
+                <span>TipFunder Payment</span>
                 <ExternalLink className="w-3.5 h-3.5 text-black" />
-              </a>
-            )}
-
-            {paymentLinks.x && (
-              <a
-                href={paymentLinks.x}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 rounded-full bg-black text-white hover:bg-gray-800 font-bold text-xs transition-transform active:scale-95 flex items-center gap-1.5"
-              >
-                <span>X Profile</span>
-              </a>
-            )}
-
-            {paymentLinks.telegram && (
-              <a
-                href={paymentLinks.telegram}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 rounded-full bg-sky-600 text-white hover:bg-sky-700 font-bold text-xs transition-transform active:scale-95 flex items-center gap-1.5"
-              >
-                <span>Telegram Channel</span>
               </a>
             )}
           </div>
 
         </div>
 
-        {/* Right Column: Interactive Photo Slideshow */}
-        <div className="relative w-full group">
-          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl border border-gray-200/80 bg-black aspect-[3/4] transition-all">
-            
-            {/* Slide Image */}
-            <img
-              src={gallerySlides[currentSlide] || GALLERY_SLIDES[0]}
-              alt={`Creator gallery slide ${currentSlide + 1}`}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center transition-all duration-700"
-            />
+        {/* Right Column: Interactive Gallery */}
+        <div className="w-full">
+          {gallerySlides.length > 0 ? (
+            <div className="relative aspect-[4/5] sm:aspect-[3/4] w-full rounded-3xl overflow-hidden border border-gray-200 shadow-md group bg-neutral-900">
+              <img
+                src={gallerySlides[currentSlide]}
+                alt={`${creatorName} Portrait`}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
 
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
-
-            {/* Left Nav Button */}
-            {gallerySlides.length > 1 && (
-              <button
-                onClick={prevSlide}
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md border border-white/20 transition-all opacity-80 group-hover:opacity-100 cursor-pointer"
-                title="Previous Photo"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            )}
-
-            {/* Right Nav Button */}
-            {gallerySlides.length > 1 && (
-              <button
-                onClick={nextSlide}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md border border-white/20 transition-all opacity-80 group-hover:opacity-100 cursor-pointer"
-                title="Next Photo"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            )}
-
-            {/* Slide Indicators Dots */}
-            {gallerySlides.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/20">
-                {gallerySlides.map((_, idx) => (
+              {/* Slide Navigation Buttons */}
+              {gallerySlides.length > 1 && (
+                <>
                   <button
-                    key={idx}
-                    onClick={() => setCurrentSlide(idx)}
-                    className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-                      currentSlide === idx ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/80'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      prevSlide();
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nextSlide();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md transition-all cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
 
-            {/* Top Right Tag */}
-            <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-bold tracking-wider border border-white/20">
-              {currentSlide + 1} / {gallerySlides.length}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md">
+                    {gallerySlides.map((_, idx) => (
+                      <span
+                        key={idx}
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${
+                          idx === currentSlide ? 'bg-white w-3' : 'bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-
-          </div>
+          ) : (
+            <div className="aspect-[4/5] sm:aspect-[3/4] w-full rounded-3xl bg-neutral-950 border border-neutral-800 p-8 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-20 h-20 rounded-full bg-neutral-900 border border-white/20 flex items-center justify-center text-white">
+                <Crown className="w-10 h-10" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold font-serif text-white">
+                  {creatorName}
+                </h3>
+                <p className="text-xs text-neutral-400 font-mono uppercase tracking-widest">
+                  OFFICIAL VIP SANCTUARY
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
@@ -301,3 +223,5 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
     </section>
   );
 };
+
+export default AboutBio;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, CheckCircle2, ExternalLink } from 'lucide-react';
-import { CollectionItem, SOCIAL_LINKS } from '../data/collectionData';
+import { X, CheckCircle2, ExternalLink, HardDrive, Play, Gift } from 'lucide-react';
+import { CollectionItem } from '../data/collectionData';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface MediaModalProps {
   item: CollectionItem | null;
@@ -12,12 +13,86 @@ interface MediaModalProps {
 export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose }) => {
   const [unlocked, setUnlocked] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [passcode, setPasscode] = useState('');
-  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [signedDownloadUrl, setSignedDownloadUrl] = useState<string | null>(null);
+  const [googleDriveDeliveryUrl, setGoogleDriveDeliveryUrl] = useState<string | null>(null);
+  const [paymentRefInput, setPaymentRefInput] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [verifySuccess, setVerifySuccess] = useState<string | null>(null);
+  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+  const [verifySuccess, setVerifySuccess] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
+
+  const throneUrl = siteSettings.throne_link || paymentSettings.throne || 'https://throne.com';
+  const tipfunderUrl = siteSettings.tipfunder_link || paymentSettings.tipfunder;
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+
+  const handleVerifyOrSubmitRef = async () => {
+    if (!paymentRefInput.trim() || !item) return;
+    setIsVerifying(true);
+    setVerifyMessage(null);
+
+    const ref = paymentRefInput.trim();
+
+    // 1. Try checking if it's an approved VIP token / passcode
+    try {
+      const verifyRes = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: item.id,
+          paymentMethod: 'Throne/TipFunder/VIP',
+          transactionRef: ref
+        })
+      });
+
+      const verifyData = await verifyRes.json();
+      if (verifyRes.ok && verifyData.verified) {
+        setUnlocked(true);
+        setVerifySuccess(true);
+        setVerifyMessage('Payment verified. Full Google Drive archive access granted.');
+        if (verifyData.accessToken) {
+          localStorage.setItem(`unlocked_media_${item.id}`, verifyData.accessToken);
+        }
+        if (verifyData.downloadUrl || verifyData.streamUrl) {
+          setSignedDownloadUrl(verifyData.downloadUrl || verifyData.streamUrl);
+        }
+        if (verifyData.googleDriveUrl || item.googleDriveLink) {
+          setGoogleDriveDeliveryUrl(verifyData.googleDriveUrl || item.googleDriveLink || null);
+        }
+        setIsVerifying(false);
+        return;
+      }
+    } catch (e) {}
+
+    // 2. Otherwise submit as payment reference request for Queen Milana to authorize in her terminal
+    try {
+      const subRes = await fetch('/api/payment-requests/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fanIdentifier: `Buyer (${ref.substring(0, 8)})`,
+          paymentMethod: 'Throne Direct',
+          transactionRef: ref,
+          videoId: item.id,
+          videoTitle: item.titleEn || item.title,
+          amount: `${item.price.toFixed(2)} €`
+        })
+      });
+      const subData = await subRes.json();
+      if (subRes.ok && subData.success) {
+        setVerifySuccess(true);
+        setVerifyMessage('Transaction reference submitted to Queen Milana for authorization.');
+      } else {
+        setVerifySuccess(false);
+        setVerifyMessage(subData.error || 'Submission failed. Please check your reference.');
+      }
+    } catch (err: any) {
+      setVerifySuccess(false);
+      setVerifyMessage('Network error. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,8 +102,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
       setIsMuted(true);
-      setVerifyError(null);
-      setVerifySuccess(null);
+      setSignedDownloadUrl(null);
+      setGoogleDriveDeliveryUrl(item.googleDriveLink || null);
       
       const savedToken = localStorage.getItem(`unlocked_media_${item.id}`);
       if (savedToken) {
@@ -39,6 +114,12 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
           .then(data => {
             if (data.hasAccess) {
               setUnlocked(true);
+              if (data.downloadUrl || data.streamUrl) {
+                setSignedDownloadUrl(data.downloadUrl || data.streamUrl);
+              }
+              if (data.googleDriveUrl || item.googleDriveLink) {
+                setGoogleDriveDeliveryUrl(data.googleDriveUrl || item.googleDriveLink || null);
+              }
             }
           })
           .catch(() => {});
@@ -73,63 +154,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
     }
   };
 
-  const handleVerifyPayment = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!passcode.trim()) {
-      setVerifyError('Please enter a transaction reference or VIP code.');
-      return;
-    }
-
-    setIsVerifying(true);
-    setVerifyError(null);
-    setVerifySuccess(null);
-
-    const cleanRef = passcode.trim().toUpperCase();
-    const VALID_VIP_PASSCODES = ['LAYLA2026', 'GODDESS-VIP', 'INAYA2026', 'REINE-VIP', 'DOMINION-VIP', 'PAID2026', 'SPECIAL-ACCESS'];
-    const isValidPasscode = VALID_VIP_PASSCODES.includes(cleanRef);
-    const isValidTxnFormat = cleanRef.startsWith("REV-") || cleanRef.startsWith("PP-") || cleanRef.startsWith("TXN-") || cleanRef.length >= 8;
-
-    let verified = false;
-    let token = `ACCESS-${item.id}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-
-    try {
-      const response = await fetch('/api/verify-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemId: item.id,
-          paymentMethod: 'tipfunder',
-          transactionRef: passcode.trim()
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json().catch(() => null);
-        if (result && result.verified) {
-          verified = true;
-          if (result.accessToken) token = result.accessToken;
-        }
-      }
-    } catch (err) {
-      console.warn('Backend verification offline, verifying reference format client-side.');
-    }
-
-    // Client-side fallback verification if backend API was unreachable
-    if (!verified && (isValidPasscode || isValidTxnFormat)) {
-      verified = true;
-    }
-
-    if (verified) {
-      setVerifySuccess('Payment successfully verified! Full video unlocked.');
-      setUnlocked(true);
-      localStorage.setItem(`unlocked_media_${item.id}`, token);
-    } else {
-      setVerifyError('Verification failed. Please enter a valid transaction reference or VIP passcode (e.g. LAYLA2026).');
-    }
-
-    setIsVerifying(false);
-  };
-
   return (
     <div 
       onClick={onClose}
@@ -143,8 +167,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase font-sans flex items-center gap-2">
-            <span>Goddess Layla — {unlocked ? 'Full Video Unlocked' : 'Preview Video'}</span>
-            {unlocked && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-bold">VERIFIED</span>}
+            <span>{creatorName} — {unlocked ? 'Full Archive Authorized' : 'Preview Mode'}</span>
+            {unlocked && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-black border border-gray-300 text-[10px] font-bold">AUTHORIZED</span>}
           </span>
           
           <button
@@ -160,9 +184,11 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         <div className="relative aspect-video w-full bg-black overflow-hidden group">
           <video
             ref={videoRef}
-            key={item.id}
+            key={`${item.id}-${signedDownloadUrl ? 'full' : 'preview'}`}
             poster={item.thumbnailUrl}
             controls
+            controlsList="nodownload"
+            onContextMenu={(e) => e.preventDefault()}
             autoPlay
             loop
             muted={isMuted}
@@ -172,7 +198,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
             crossOrigin="anonymous"
             className="w-full h-full object-contain"
           >
-            <source src={item.previewUrl} type="video/mp4" referrerPolicy="no-referrer" />
+            <source src={signedDownloadUrl || item.previewUrl} type="video/mp4" referrerPolicy="no-referrer" />
           </video>
 
           {/* Sound Toggle Floating Overlay Button */}
@@ -181,7 +207,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
               onClick={toggleMute}
               className="absolute top-4 right-4 z-20 px-4 py-2 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-lg backdrop-blur-md transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
             >
-              <span>Unmute Sound</span>
+              <span>Enable Sound</span>
             </button>
           )}
         </div>
@@ -212,7 +238,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
           <div className="w-full md:w-80 shrink-0 bg-gray-50/90 border border-gray-200/80 rounded-2xl p-5 flex flex-col items-center sm:items-end justify-center gap-3 text-center sm:text-right">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 block">
-                FULL VIDEO
+                FULL ARCHIVE
               </span>
               <span className="text-2xl sm:text-3xl font-extrabold text-black">
                 {item.price.toFixed(2)} €
@@ -221,75 +247,64 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
 
             {!unlocked ? (
               <div className="flex flex-col gap-2.5 w-full">
-                {/* TipFunder Direct Link */}
+                {/* Throne Direct Link */}
                 <a
-                  href={SOCIAL_LINKS.tipfunder}
+                  href={throneUrl}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => setShowCodeInput(true)}
                   className="w-full px-4 py-3 rounded-xl bg-black hover:bg-gray-800 text-white font-bold text-xs shadow-xs transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer text-center"
                 >
-                  <span>Pay via TipFunder ({item.price.toFixed(2)} €)</span>
+                  <Gift className="w-3.5 h-3.5 text-white" />
+                  <span>Pay via Throne ({item.price.toFixed(2)} €)</span>
                   <ExternalLink className="w-3.5 h-3.5 text-white" />
                 </a>
 
-                {/* Verification Form Trigger */}
-                {!showCodeInput ? (
+                {/* Submit Payment Ref / Passcode Unlock */}
+                <div className="pt-2 border-t border-gray-200">
+                  <input
+                    type="text"
+                    placeholder="Enter Throne Ref or Passcode"
+                    value={paymentRefInput}
+                    onChange={(e) => setPaymentRefInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs font-mono text-black focus:outline-none focus:border-black mb-1.5"
+                  />
                   <button
-                    onClick={() => setShowCodeInput(true)}
-                    className="w-full py-2.5 px-4 rounded-xl border border-dashed border-gray-400 hover:border-black text-black font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    onClick={handleVerifyOrSubmitRef}
+                    disabled={isVerifying || !paymentRefInput.trim()}
+                    className="w-full py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Enter Code / Txn Ref</span>
+                    {isVerifying ? 'Verifying...' : 'Request Access'}
                   </button>
-                ) : (
-                  <form onSubmit={handleVerifyPayment} className="flex flex-col gap-2 w-full pt-1">
-                    <input
-                      type="text"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="TipFunder Ref or VIP Code (e.g. LAYLA2026)"
-                      className="w-full px-3 py-2 rounded-xl text-xs bg-white border border-gray-300 focus:border-black focus:outline-hidden text-black placeholder:text-gray-400"
-                    />
-
-                    {verifyError && (
-                      <p className="text-[11px] font-medium text-red-600 bg-red-50 p-2 rounded-lg text-left">
-                        {verifyError}
-                      </p>
-                    )}
-
-                    {verifySuccess && (
-                      <p className="text-[11px] font-medium text-green-700 bg-green-50 p-2 rounded-lg text-left">
-                        {verifySuccess}
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={isVerifying}
-                      className="w-full py-2.5 rounded-xl bg-black hover:bg-gray-800 text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {isVerifying ? (
-                        <span>Verifying...</span>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                          <span>Verify & Unlock</span>
-                        </>
-                      )}
-                    </button>
-                    <p className="text-[10px] text-gray-500 text-center">
-                      Paid on TipFunder? Enter code LAYLA2026 or transaction reference.
+                  {verifyMessage && (
+                    <p className={`text-[11px] mt-1.5 text-center font-medium ${verifySuccess ? 'text-black font-semibold' : 'text-gray-600'}`}>
+                      {verifyMessage}
                     </p>
-                  </form>
-                )}
+                  )}
+                </div>
+
+                <p className="text-[11px] text-gray-500 text-center">
+                  Access is released by {creatorName} upon verification.
+                </p>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-800 text-xs font-bold border border-green-200 w-full">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  <span>Video Access Verified</span>
+              <div className="flex flex-col items-center gap-2.5 w-full">
+                <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-black text-xs font-bold border border-gray-300 w-full">
+                  <CheckCircle2 className="w-4 h-4 text-black" />
+                  <span>Access Authorized</span>
                 </div>
+
+                {googleDriveDeliveryUrl && (
+                  <a
+                    href={googleDriveDeliveryUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full px-4 py-3 rounded-xl bg-black hover:bg-gray-800 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer text-center"
+                  >
+                    <HardDrive className="w-4 h-4 text-white" />
+                    <span>Open in Google Drive</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-white" />
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -300,3 +315,5 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
     </div>
   );
 };
+
+export default MediaModal;

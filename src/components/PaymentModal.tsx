@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Send, ExternalLink, Check, Gift } from 'lucide-react';
-import { SOCIAL_LINKS } from '../data/collectionData';
+import React, { useState } from 'react';
+import { X, Send, ExternalLink, Check, Gift, CreditCard } from 'lucide-react';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -11,43 +11,23 @@ interface PaymentModalProps {
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [message, setMessage] = useState<string>('');
   const [sent, setSent] = useState(false);
-  const [tipfunderUrl, setTipfunderUrl] = useState<string>(SOCIAL_LINKS.tipfunder);
-  const [throneUrl, setThroneUrl] = useState<string>(SOCIAL_LINKS.throne);
-
-  useEffect(() => {
-    fetch('/api/payment-settings')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) {
-          if (data.tipfunder) setTipfunderUrl(data.tipfunder);
-          if (data.throne) setThroneUrl(data.throne);
-        }
-      })
-      .catch(() => {});
-
-    try {
-      const savedPay = localStorage.getItem('goddess_payment_settings');
-      if (savedPay) {
-        const parsed = JSON.parse(savedPay);
-        if (parsed.tipfunder) setTipfunderUrl(parsed.tipfunder);
-        if (parsed.throne) setThroneUrl(parsed.throne);
-      }
-    } catch (e) {}
-  }, [isOpen]);
+  const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
 
   if (!isOpen) return null;
 
+  const tipfunderUrl = siteSettings.tipfunder_link || paymentSettings.tipfunder || 'https://tipfunder.com';
+  const throneUrl = siteSettings.throne_link || paymentSettings.throne || 'https://throne.com';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
   const currentAmount = customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmitTipfunder = (e: React.FormEvent) => {
     e.preventDefault();
     setSent(true);
     setTimeout(() => {
-      window.open(tipfunderUrl || SOCIAL_LINKS.tipfunder, '_blank');
+      window.open(tipfunderUrl, '_blank');
       setSent(false);
-    }, 1000);
+    }, 600);
   };
 
   return (
@@ -63,7 +43,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase">
-            Goddess Layla - TipFunder Payment Portal
+            {creatorName} - Payment & Tribute Portal
           </span>
           <button
             onClick={onClose}
@@ -78,22 +58,56 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
           
           <div className="text-center space-y-1.5">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-black tracking-tight">
-              TipFunder Tribute
+              Direct Payment & Tribute
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto">
-              TipFunder is the official payment method for Goddess Layla.
+              Official centralized payment channels for {creatorName}.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-            {/* Amount Selection Grid */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
-                SELECT AMOUNT
-              </label>
-              <div className="grid grid-cols-3 gap-2.5">
-                {[25, 50, 100, 250, 500, 1000].map((amt) => (
+          {/* Direct Throne Option */}
+          {throneUrl && (
+            <div className="p-4 rounded-2xl bg-neutral-950 text-white space-y-2.5 border border-neutral-800 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-white" />
+                  <span className="text-xs font-mono font-bold text-white uppercase">
+                    THRONE DIRECT PAYMENT & WISHLIST
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-white bg-neutral-900 border border-white/20 px-2 py-0.5 rounded">
+                  RECOMMENDED
+                </span>
+              </div>
+              <p className="text-xs text-neutral-300">
+                Direct gifts and transactions through the verified Throne account of {creatorName}.
+              </p>
+              <a
+                href={throneUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3 rounded-xl bg-white hover:bg-gray-200 text-black font-bold text-xs uppercase font-mono tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer text-center"
+              >
+                <span>Open Throne Portal</span>
+                <ExternalLink className="w-3.5 h-3.5 text-black" />
+              </a>
+            </div>
+          )}
+
+          {/* TipFunder Option */}
+          {tipfunderUrl && (
+            <form onSubmit={handleSubmitTipfunder} className="space-y-4 pt-2 border-t border-gray-200">
+              
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-neutral-800" />
+                <span className="text-xs font-bold uppercase tracking-wider text-black">
+                  TipFunder Tribute Portal
+                </span>
+              </div>
+
+              {/* Amount Presets */}
+              <div className="grid grid-cols-4 gap-2">
+                {[50, 100, 250, 500].map((amt) => (
                   <button
                     key={amt}
                     type="button"
@@ -101,87 +115,36 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
                       setSelectedAmount(amt);
                       setCustomAmount('');
                     }}
-                    className={`py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                      !customAmount && selectedAmount === amt
-                        ? 'bg-black text-white shadow-md'
-                        : 'bg-gray-100/90 hover:bg-gray-200/90 text-black border border-gray-200/60'
+                    className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition-all cursor-pointer ${
+                      selectedAmount === amt && !customAmount
+                        ? 'bg-black text-white border-black shadow-xs'
+                        : 'bg-gray-50 text-black border-gray-200 hover:bg-gray-100'
                     }`}
                   >
-                    ${amt}
+                    {amt} €
                   </button>
                 ))}
               </div>
-            </div>
 
-            {/* Custom Amount Input */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
-                OR ENTER DESIRED AMOUNT ($)
-              </label>
-              <input
-                type="number"
-                placeholder="$ e.g. 750"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                className="w-full bg-gray-100/90 border border-gray-200/80 focus:bg-white focus:ring-2 focus:ring-black rounded-2xl px-4 py-3 text-sm font-medium text-black placeholder:text-gray-400 focus:outline-hidden transition-all"
-              />
-            </div>
+              <button
+                type="submit"
+                className="w-full py-3.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs uppercase font-mono tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {sent ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Redirecting to TipFunder...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Pay {currentAmount} € via TipFunder</span>
+                    <ExternalLink className="w-4 h-4 text-white" />
+                  </>
+                )}
+              </button>
 
-            {/* Message Area */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
-                MESSAGE FOR GODDESS LAYLA
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Write your note or tribute message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="w-full bg-gray-100/90 border border-gray-200/80 focus:bg-white focus:ring-2 focus:ring-black rounded-2xl p-4 text-sm font-medium text-black placeholder:text-gray-400 focus:outline-hidden transition-all resize-none"
-              />
-            </div>
-
-            {/* Send Tribute Button */}
-            <button
-              type="submit"
-              className="w-full py-4 rounded-full bg-black hover:bg-gray-800 text-white font-extrabold text-sm tracking-wide shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-              <span>Pay ${currentAmount} on TipFunder</span>
-            </button>
-
-            {sent && (
-              <div className="p-3 bg-gray-100 border border-gray-300 text-black text-xs rounded-2xl text-center font-bold flex items-center justify-center gap-2 animate-fade-in">
-                <Check className="w-4 h-4 text-emerald-600" />
-                <span>Redirecting to TipFunder...</span>
-              </div>
-            )}
-
-          </form>
-
-          {/* Quick External Links */}
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs font-bold text-gray-600">
-            <a 
-              href={tipfunderUrl} 
-              target="_blank" 
-              rel="noreferrer"
-              className="hover:underline flex items-center gap-1 text-black font-bold"
-            >
-              <span>TipFunder Direct</span>
-              <ExternalLink className="w-3.5 h-3.5 text-black" />
-            </a>
-            <span>•</span>
-            <a 
-              href={throneUrl} 
-              target="_blank" 
-              rel="noreferrer"
-              className="hover:underline flex items-center gap-1 text-black font-bold"
-            >
-              <Gift className="w-3.5 h-3.5 text-black" />
-              <span>Throne Wishlist</span>
-              <ExternalLink className="w-3.5 h-3.5 text-black" />
-            </a>
-          </div>
+            </form>
+          )}
 
         </div>
 
@@ -189,3 +152,5 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
     </div>
   );
 };
+
+export default PaymentModal;

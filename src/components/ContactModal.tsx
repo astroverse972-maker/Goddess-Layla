@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Send, CheckCircle2 } from 'lucide-react';
-import { SOCIAL_LINKS } from '../data/collectionData';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -14,6 +14,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
   const [sessionType, setSessionType] = useState('VIP Sanctuary / Custom Request');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const { paymentSettings, creatorProfile } = useSiteSettings();
+
+  const creatorName = creatorProfile.name || 'Goddess Milana';
 
   if (!isOpen) return null;
 
@@ -42,7 +45,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase font-sans">
-            Goddess Layla - Contact & Booking
+            {creatorName} - Contact & Booking
           </span>
           <button
             onClick={onClose}
@@ -56,9 +59,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         <div className="p-6 sm:p-8 space-y-6">
           
           <div className="text-center space-y-1">
-            <h4 className="font-serif text-2xl font-bold text-black">Goddess Layla</h4>
+            <h4 className="font-serif text-2xl font-bold text-black">{creatorName}</h4>
             <p className="text-xs text-gray-500 font-medium">
-              Telegram: laylathebest • VIP Space
+              Official VIP Sanctuary Contact
             </p>
           </div>
 
@@ -133,32 +136,38 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
             {submitted && (
               <div className="p-3 bg-gray-100 border border-gray-300 text-black text-xs rounded-2xl text-center font-bold flex items-center justify-center gap-2 animate-fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Message sent! Goddess Layla will review your request.</span>
+                <CheckCircle2 className="w-4 h-4 text-black" />
+                <span>Message sent! {creatorName} will review your request.</span>
               </div>
             )}
           </form>
 
           {/* Socials Link Footer */}
-          <div className="pt-2 border-t border-gray-100 text-center text-xs font-bold space-x-3">
-            <a 
-              href={SOCIAL_LINKS.telegram} 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-sky-600 hover:underline"
-            >
-              Telegram: @laylathebest
-            </a>
-            <span>•</span>
-            <a 
-              href={SOCIAL_LINKS.x} 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-black hover:underline"
-            >
-              X: @Geldherrinlay9
-            </a>
-          </div>
+          {(paymentSettings.telegram || paymentSettings.x) && (
+            <div className="pt-2 border-t border-gray-100 text-center text-xs font-bold space-x-3">
+              {paymentSettings.telegram && (
+                <a 
+                  href={paymentSettings.telegram} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-black hover:underline"
+                >
+                  Telegram Channel
+                </a>
+              )}
+              {paymentSettings.telegram && paymentSettings.x && <span>•</span>}
+              {paymentSettings.x && (
+                <a 
+                  href={paymentSettings.x} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-black hover:underline"
+                >
+                  X (Twitter)
+                </a>
+              )}
+            </div>
+          )}
 
         </div>
 

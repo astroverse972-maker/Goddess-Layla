@@ -12,8 +12,9 @@ import { PaymentModal } from './components/PaymentModal';
 import { ContactModal } from './components/ContactModal';
 import { MistressAdminModal } from './components/MistressAdminModal';
 import { COLLECTION_ITEMS, CollectionItem } from './data/collectionData';
+import { SiteSettingsProvider } from './context/SiteSettingsContext';
 
-export function App() {
+export function MainAppContent() {
   const [lang, setLang] = useState<'fr' | 'en'>('en');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMedia, setSelectedMedia] = useState<CollectionItem | null>(null);
@@ -35,10 +36,10 @@ export function App() {
   // Live Stream State from Server
   const [liveState, setLiveState] = useState({
     isLive: false,
-    title: 'Exclusive Live Session with Goddess Layla',
+    title: 'Exclusive Live Session with Goddess Milana',
     description: 'Exclusive live stream preview. Enter my VIP sanctuary. Reserved for verified devotees.',
     price: '20.00 €',
-    streamUrl: 'https://i.imgur.com/m0CSW44.mp4',
+    streamUrl: '',
   });
 
   // Custom Uploaded Media Items
@@ -84,23 +85,31 @@ export function App() {
     fetchServerState();
     const interval = setInterval(fetchServerState, 5000); // sync every 5 seconds
 
-    // Check if URL indicates admin portal request strictly via #admin or /admin
+    // Check if URL indicates admin portal request strictly via path /admin
     const checkAdminRoute = () => {
-      const hash = window.location.hash.toLowerCase();
       const path = window.location.pathname.toLowerCase();
-      if (hash === '#admin' || path.endsWith('/admin')) {
+      if (path === '/admin' || path === '/admin/') {
         setIsMistressAdminOpen(true);
+      } else {
+        setIsMistressAdminOpen(false);
       }
     };
 
     checkAdminRoute();
-    window.addEventListener('hashchange', checkAdminRoute);
+    window.addEventListener('popstate', checkAdminRoute);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('popstate', checkAdminRoute);
     };
   }, []);
+
+  const handleCloseAdmin = () => {
+    setIsMistressAdminOpen(false);
+    if (window.location.pathname.toLowerCase().startsWith('/admin')) {
+      window.history.replaceState(null, '', '/');
+    }
+  };
 
   const scrollToCollection = () => {
     const el = document.getElementById('collection');
@@ -164,13 +173,13 @@ export function App() {
         {/* Tribute Section */}
         <TributeSection lang={lang} />
 
-        {/* Boss Layla Bio & Slideshow Section */}
+        {/* Goddess Milana Bio & Slideshow Section */}
         <AboutBio lang={lang} />
 
       </main>
 
       {/* Footer */}
-      <Footer lang={lang} onOpenAdmin={() => setIsMistressAdminOpen(true)} />
+      <Footer lang={lang} />
 
       {/* Modals */}
       <MediaModal
@@ -207,7 +216,7 @@ export function App() {
 
       <MistressAdminModal
         isOpen={isMistressAdminOpen}
-        onClose={() => setIsMistressAdminOpen(false)}
+        onClose={handleCloseAdmin}
         lang={lang}
         currentLiveState={liveState}
         onUpdateLiveState={(newState) => setLiveState(newState)}
@@ -217,6 +226,14 @@ export function App() {
       />
 
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <SiteSettingsProvider>
+      <MainAppContent />
+    </SiteSettingsProvider>
   );
 }
 

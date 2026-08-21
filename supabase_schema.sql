@@ -24,13 +24,14 @@ CREATE TABLE public.content_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   price TEXT NOT NULL DEFAULT '25.00',
+  video_storage_path TEXT, -- Supabase Storage path in 'premium_videos' bucket (e.g. raw/17180000_video.mp4)
   google_drive_link TEXT,
   video_url TEXT,
   thumbnail_url TEXT,
-  category TEXT DEFAULT 'Goddess Exclusive', -- Free text category (self-written)
-  name TEXT DEFAULT 'Goddess Layla',
+  category TEXT DEFAULT 'Queen Exclusive', -- Free text category (self-written)
+  name TEXT DEFAULT 'Queen Milana',
   description TEXT,
-  tags TEXT[] DEFAULT ARRAY['exclusive', 'goddesslayla'],
+  tags TEXT[] DEFAULT ARRAY['exclusive', 'queenmilana'],
   status TEXT DEFAULT 'published',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -120,7 +121,7 @@ CREATE POLICY "Allow public insert on soft_deleted_videos"
 -- ====================================================================
 CREATE TABLE public.creator_profile (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT DEFAULT 'Goddess Layla',
+  name TEXT DEFAULT 'Queen Milana',
   bio TEXT,
   gallery TEXT[],
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -154,6 +155,6 @@ CREATE POLICY "Allow public all on payment_settings"
 INSERT INTO public.site_settings (key, value)
 VALUES 
   ('admin_passcode', '"1234"'::jsonb),
-  ('live_stream_status', '{"isLive": false, "title": "GODDESS LAYLA LIVE EXCLUSIVE", "description": "Exclusive live private session", "price": "50.00", "streamUrl": "https://i.imgur.com/m0CSW44.mp4"}'::jsonb),
-  ('creator_profile', '{"name": "Goddess Layla", "bio": "Welcome to my official VIP sanctuary.", "gallery": ["https://i.imgur.com/STRpELi.jpg", "https://i.imgur.com/bjTQJK7.jpg", "https://i.imgur.com/tzmLquQ.jpg", "https://i.imgur.com/g5fQwuf.jpg"]}'::jsonb),
+  ('live_stream_status', '{"isLive": false, "title": "QUEEN MILANA LIVE EXCLUSIVE", "description": "Exclusive live private session", "price": "50.00", "streamUrl": "https://i.imgur.com/m0CSW44.mp4"}'::jsonb),
+  ('creator_profile', '{"name": "Queen Milana", "bio": "Welcome to my official VIP sanctuary.", "gallery": ["https://i.imgur.com/STRpELi.jpg", "https://i.imgur.com/bjTQJK7.jpg", "https://i.imgur.com/tzmLquQ.jpg", "https://i.imgur.com/g5fQwuf.jpg"]}'::jsonb),
   ('payment_settings', '{"tipfunder": "https://www.tipfunder.com/Geldherrinlay9", "throne": "https://throne.com/geldherrinlayla", "telegram": "https://t.me/laylathebest", "x": "https://x.com/Geldherrinlay9"}'::jsonb);

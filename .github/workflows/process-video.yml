@@ -1,0 +1,93 @@
+name: Process Premium Video
+
+on:
+  repository_dispatch:
+    types: [process_video]
+  workflow_dispatch:
+    inputs:
+      submission_id:
+        description: 'Submission ID'
+        required: true
+      video_download_url:
+        description: 'Signed Supabase Download URL'
+        required: true
+      video_storage_path:
+        description: 'Supabase Storage Path in premium_videos bucket'
+        required: true
+
+jobs:
+  transcode-and-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: '6.0'
+
+      - name: Download Raw Video from Supabase Storage
+        run: |
+          echo "Downloading video from temporary Signed URL..."
+          DOWNLOAD_URL="${{ github.event.client_payload.video_download_url || inputs.video_download_url }}"
+          curl -L "$DOWNLOAD_URL" -o input_raw.mp4 --fail --silent --show-error
+          ls -lh input_raw.mp4
+
+      - name: Generate High-Definition Teaser & Poster Frames
+        run: |
+          mkdir -p output
+          
+          # 1. Extract high quality primary poster frame thumbnail at 2 seconds
+          ffmpeg -y -ss 00:00:02 -i input_raw.mp4 -vframes 1 -q:v 2 output/thumbnail.jpg
+          
+          # 2. Extract static JPG preview frames (at 5s, 10s, 15s) for the static preview slideshow
+          ffmpeg -y -ss 00:00:05 -i input_raw.mp4 -vframes 1 -q:v 2 output/frame_1.jpg || cp output/thumbnail.jpg output/frame_1.jpg
+          ffmpeg -y -ss 00:00:10 -i input_raw.mp4 -vframes 1 -q:v 2 output/frame_2.jpg || cp output/thumbnail.jpg output/frame_2.jpg
+          ffmpeg -y -ss 00:00:15 -i input_raw.mp4 -vframes 1 -q:v 2 output/frame_3.jpg || cp output/thumbnail.jpg output/frame_3.jpg
+          
+          # 3. Generate 15-second teaser for verified VIP in-app stream
+          ffmpeg -y -i input_raw.mp4 -t 15 -vf "scale=1920:-2" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart output/preview.mp4
+
+      - name: Upload Processed Assets to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUBMISSION_ID: ${{ github.event.client_payload.submission_id || inputs.submission_id }}
+          STORAGE_PATH: ${{ github.event.client_payload.video_storage_path || inputs.video_storage_path }}
+        run: |
+          echo "Uploading generated preview and thumbnail frames back to Supabase..."
+          
+          BASE_NAME="$(basename "$STORAGE_PATH" .mp4)"
+          THUMB_NAME="thumb_${BASE_NAME}.jpg"
+          
+          # Upload primary poster thumbnail
+          curl -X POST "${SUPABASE_URL}/storage/v1/object/premium_videos/thumbnails/${THUMB_NAME}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: image/jpeg" \
+            --data-binary "@output/thumbnail.jpg"
+
+          # Upload static slideshow frame stills
+          for f in 1 2 3; do
+            if [ -f "output/frame_${f}.jpg" ]; then
+              curl -X POST "${SUPABASE_URL}/storage/v1/object/premium_videos/thumbnails/frame_${f}_${BASE_NAME}.jpg" \
+                -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+                -H "Content-Type: image/jpeg" \
+                --data-binary "@output/frame_${f}.jpg"
+            fi
+          done
+
+          # Upload teaser preview to premium_videos/previews/
+          PREV_NAME="preview_$(basename "$STORAGE_PATH")"
+          curl -X POST "${SUPABASE_URL}/storage/v1/object/premium_videos/previews/${PREV_NAME}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: video/mp4" \
+            --data-binary "@output/preview.mp4"
+
+          # Update submission status to 'ready' in content_submissions table
+          curl -X PATCH "${SUPABASE_URL}/rest/v1/content_submissions?id=eq.${SUBMISSION_ID}" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{\"status\": \"ready\", \"thumbnail_url\": \"${SUPABASE_URL}/storage/v1/object/public/premium_videos/thumbnails/${THUMB_NAME}\"}"
