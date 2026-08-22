@@ -57,8 +57,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         if (verifyData.downloadUrl || verifyData.streamUrl) {
           setSignedDownloadUrl(verifyData.downloadUrl || verifyData.streamUrl);
         }
-        if (verifyData.googleDriveUrl || (item as any).googleDriveLink) {
-          setGoogleDriveDeliveryUrl(verifyData.googleDriveUrl || (item as any).googleDriveLink || null);
+        if (verifyData.googleDriveUrl) {
+          setGoogleDriveDeliveryUrl(verifyData.googleDriveUrl);
         }
         setIsVerifying(false);
         return;
@@ -118,8 +118,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
               if (data.downloadUrl || data.streamUrl) {
                 setSignedDownloadUrl(data.downloadUrl || data.streamUrl);
               }
-              if (data.googleDriveUrl || (item as any).googleDriveLink) {
-                setGoogleDriveDeliveryUrl(data.googleDriveUrl || (item as any).googleDriveLink || null);
+              if (data.googleDriveUrl) {
+                setGoogleDriveDeliveryUrl(data.googleDriveUrl);
               }
             }
           })

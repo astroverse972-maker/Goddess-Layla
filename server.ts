@@ -1494,14 +1494,27 @@ app.get("/api/custom-media", async (req, res) => {
   // Filter out soft-deleted videos
   const activeMedia = media.filter((item) => !softDeletedVideoIds.has(String(item.id)));
 
-  // For public visitors (non-admins), strip private Google Drive delivery links and storage paths
+  // For public visitors (non-admins), strictly strip private Google Drive delivery links and storage paths
   const isAdmin = checkIsAdmin(req);
   const safeMedia = activeMedia.map((item) => {
     if (isAdmin) {
       return item;
     }
-    const { googleDriveLink, google_drive_link, video_storage_path, videoStoragePath, ...publicItem } = item;
-    return publicItem;
+    const copy = { ...item };
+    delete copy.googleDriveLink;
+    delete copy.google_drive_link;
+    delete copy.video_storage_path;
+    delete copy.videoStoragePath;
+
+    // Never leak raw Google Drive or internal storage links as public preview/video URLs
+    if (isUrlOrDriveLinkServer(copy.previewUrl) || (copy.previewUrl && copy.previewUrl.includes("supabase://"))) {
+      copy.previewUrl = null;
+    }
+    if (isUrlOrDriveLinkServer(copy.videoUrl) || (copy.videoUrl && copy.videoUrl.includes("supabase://"))) {
+      copy.videoUrl = null;
+    }
+
+    return copy;
   });
 
   res.json({
@@ -1963,7 +1976,7 @@ const VALID_VIP_PASSCODES = new Set([
 ]);
 
 // Server-stored verified transactions token registry
-const verifiedAccessTokens = new Map<string, { itemId: string; timestamp: number; downloadUrl?: string }>();
+const verifiedAccessTokens = new Map<string, { itemId: string; timestamp: number; downloadUrl?: string; googleDriveUrl?: string }>();
 
 app.post("/api/verify-payment", async (req, res) => {
   try {
@@ -1987,19 +2000,29 @@ app.post("/api/verify-payment", async (req, res) => {
     if (isValidPasscode || isValidTxnFormat) {
       const token = `ACCESS-${itemId}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
       
-      // Look up if this item has a Supabase Storage path to generate 24-hour signed download URL
+      // Look up if this item has a Supabase Storage path or Google Drive link for delivery
       let downloadUrl: string | null = null;
+      let googleDriveUrl: string | null = null;
+      const matchingMem = customUploadedMedia.find(m => m.id === itemId);
+      if (matchingMem?.googleDriveLink) {
+        googleDriveUrl = matchingMem.googleDriveLink;
+      }
+
       const supabase = getSupabaseServerClient();
       if (supabase) {
         try {
           // Check content_submissions
           const { data: sub } = await supabase
             .from("content_submissions")
-            .select("video_storage_path")
+            .select("video_storage_path, google_drive_link")
             .eq("id", itemId)
             .maybeSingle();
 
-          const storagePath = sub?.video_storage_path || customUploadedMedia.find(m => m.id === itemId)?.video_storage_path;
+          if (sub?.google_drive_link) {
+            googleDriveUrl = sub.google_drive_link;
+          }
+
+          const storagePath = sub?.video_storage_path || matchingMem?.video_storage_path;
 
           if (storagePath) {
             const { data: signedData } = await supabase
@@ -2016,13 +2039,19 @@ app.post("/api/verify-payment", async (req, res) => {
         }
       }
 
-      verifiedAccessTokens.set(token, { itemId, timestamp: Date.now(), downloadUrl: downloadUrl || undefined });
+      verifiedAccessTokens.set(token, { 
+        itemId, 
+        timestamp: Date.now(), 
+        downloadUrl: downloadUrl || undefined,
+        googleDriveUrl: googleDriveUrl || undefined
+      });
 
       return res.json({
         verified: true,
         accessToken: token,
         downloadUrl,
         streamUrl: downloadUrl,
+        googleDriveUrl,
         expiresInHours: 24,
         message: "Payment successfully verified! Your 24-hour secure delivery link is active.",
         method: paymentMethod || "manual_ref"
@@ -2040,7 +2069,7 @@ app.post("/api/verify-payment", async (req, res) => {
 });
 
 // Endpoint to verify access token for a video
-app.get("/api/check-access/:itemId", (req, res) => {
+app.get("/api/check-access/:itemId", async (req, res) => {
   const { itemId } = req.params;
   const authHeader = req.headers.authorization;
   const token = authHeader?.replace("Bearer ", "");
@@ -2048,7 +2077,43 @@ app.get("/api/check-access/:itemId", (req, res) => {
   if (token && verifiedAccessTokens.has(token)) {
     const session = verifiedAccessTokens.get(token);
     if (session?.itemId === itemId) {
-      return res.json({ hasAccess: true });
+      let googleDriveUrl = session.googleDriveUrl || null;
+      let downloadUrl = session.downloadUrl || null;
+
+      if (!googleDriveUrl || !downloadUrl) {
+        const mem = customUploadedMedia.find(m => m.id === itemId);
+        if (!googleDriveUrl && mem?.googleDriveLink) googleDriveUrl = mem.googleDriveLink;
+
+        const supabase = getSupabaseServerClient();
+        if (supabase) {
+          try {
+            const { data: dbItem } = await supabase
+              .from("content_submissions")
+              .select("google_drive_link, video_storage_path")
+              .eq("id", itemId)
+              .maybeSingle();
+
+            if (dbItem?.google_drive_link && !googleDriveUrl) {
+              googleDriveUrl = dbItem.google_drive_link;
+            }
+            if (dbItem?.video_storage_path && !downloadUrl) {
+              const { data: signedData } = await supabase.storage
+                .from("premium_videos")
+                .createSignedUrl(dbItem.video_storage_path, 86400);
+              if (signedData?.signedUrl) {
+                downloadUrl = signedData.signedUrl;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      return res.json({ 
+        hasAccess: true,
+        downloadUrl,
+        streamUrl: downloadUrl,
+        googleDriveUrl
+      });
     }
   }
 
@@ -2112,7 +2177,10 @@ app.post("/api/content-submissions", async (req, res) => {
 });
 
 // Endpoint for site owner/admin to view all posted Google Drive submissions & links
-app.get("/api/admin/submissions", async (_req, res) => {
+app.get("/api/admin/submissions", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
   const supabase = getSupabaseServerClient();
   let submissions = [...googleDriveSubmissions];
 
