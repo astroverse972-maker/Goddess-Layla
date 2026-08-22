@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { CollectionItem } from '../data/collectionData';
+import { cleanDisplayTitle, cleanDisplayDescription } from '../utils/sanitizeMedia';
 
 interface TheCollectionProps {
   items: CollectionItem[];
@@ -198,7 +199,7 @@ export const TheCollection: React.FC<TheCollectionProps> = ({
       {filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {filteredItems.map((item) => {
-            const title = item.titleEn || item.title;
+            const title = cleanDisplayTitle(item.titleEn || item.title, 'Exclusive Masterclass Archive');
             const category = item.categoryEn || item.category;
 
             return (

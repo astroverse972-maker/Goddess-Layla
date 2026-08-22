@@ -474,6 +474,66 @@ app.post("/api/admin/upload-profile-image", async (req, res) => {
   }
 });
 
+// POST /api/admin/upload-gallery-image - Upload an "About Me" gallery photo to Supabase storage (profile_assets)
+app.post("/api/admin/upload-gallery-image", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const { fileName, fileData, contentType } = req.body || {};
+  if (!fileData) {
+    return res.status(400).json({ error: "fileData (base64) is required." });
+  }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client not configured." });
+  }
+
+  try {
+    const cleanName = String(fileName || "gallery.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `gallery/${Date.now()}_${cleanName}`;
+    const base64Data = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    const buffer = Buffer.from(base64Data, "base64");
+    const mimeType = contentType || "image/jpeg";
+
+    const buckets = ["profile_assets", "profile_photos", "profile_images"];
+    let uploadedBucket = "";
+    let uploadError = null;
+
+    for (const bName of buckets) {
+      const { error: upErr } = await supabase.storage
+        .from(bName)
+        .upload(storagePath, buffer, { contentType: mimeType, upsert: true });
+      if (!upErr) {
+        uploadedBucket = bName;
+        break;
+      } else {
+        uploadError = upErr;
+      }
+    }
+
+    if (!uploadedBucket) {
+      return res.status(500).json({
+        error: uploadError?.message || "Failed to upload gallery image to Supabase storage bucket (profile_assets)."
+      });
+    }
+
+    const { data: publicData } = supabase.storage.from(uploadedBucket).getPublicUrl(storagePath);
+    const publicUrl = publicData?.publicUrl || "";
+
+    return res.json({
+      success: true,
+      publicUrl,
+      storagePath,
+      bucket: uploadedBucket
+    });
+  } catch (err: any) {
+    console.error("[GALLERY IMAGE UPLOAD ERROR]:", err);
+    return res.status(500).json({ error: err.message || "Internal server error uploading gallery image." });
+  }
+});
+
 // POST /api/admin/storage/profile-upload-url - Upload portrait / profile photo to Supabase storage
 app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
   if (!checkIsAdmin(req)) {
@@ -1324,9 +1384,42 @@ app.post("/api/admin/cleanup-legacy", async (req, res) => {
   }
 });
 
-app.get("/api/custom-media", async (_req, res) => {
+function isUrlOrDriveLinkServer(str: any): boolean {
+  if (!str || typeof str !== "string") return false;
+  const trimmed = str.trim().toLowerCase();
+  return (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.includes("drive.google.com") ||
+    trimmed.includes("docs.google.com") ||
+    trimmed.includes("dropbox.com") ||
+    trimmed.includes("mega.nz") ||
+    trimmed.includes("usp=drive_link") ||
+    trimmed.includes("/file/d/")
+  );
+}
+
+function cleanServerTitle(title: any, fallback = "Exclusive Masterclass Session"): string {
+  if (!title || typeof title !== "string") return fallback;
+  const trimmed = title.trim();
+  if (isUrlOrDriveLinkServer(trimmed)) return fallback;
+  return trimmed || fallback;
+}
+
+function cleanServerDescription(desc: any, fallback = "Exclusive encrypted masterclass video archive for authorized devotees."): string {
+  if (!desc || typeof desc !== "string") return fallback;
+  const trimmed = desc.trim();
+  if (isUrlOrDriveLinkServer(trimmed)) return fallback;
+  const sanitized = trimmed
+    .replace(/https?:\/\/(?:drive\.google\.com|docs\.google\.com|[\w.-]+\/file\/d\/)[^\s]+/gi, "")
+    .trim();
+  return sanitized || fallback;
+}
+
+app.get("/api/custom-media", async (req, res) => {
   const supabase = getSupabaseServerClient();
   let media: any[] = [];
+  let neededDbUpdate = false;
 
   if (supabase) {
     try {
@@ -1346,20 +1439,73 @@ app.get("/api/custom-media", async (_req, res) => {
         .maybeSingle();
 
       if (dbMediaList && Array.isArray(dbMediaList.value)) {
-        media = dbMediaList.value;
+        media = dbMediaList.value.map((item: any) => {
+          let modified = false;
+          const copy = { ...item };
+
+          // Sanitize title if it contains a URL or drive link
+          if (isUrlOrDriveLinkServer(copy.title)) {
+            if (!copy.googleDriveLink) {
+              copy.googleDriveLink = copy.title;
+            }
+            copy.title = "Exclusive Masterclass Session";
+            copy.titleEn = "Exclusive Masterclass Session";
+            modified = true;
+          }
+          if (isUrlOrDriveLinkServer(copy.titleEn)) {
+            copy.titleEn = copy.title;
+            modified = true;
+          }
+
+          // Sanitize description if it contains drive link
+          if (isUrlOrDriveLinkServer(copy.description) || (copy.description && copy.description.includes("drive.google.com"))) {
+            copy.description = cleanServerDescription(copy.description);
+            copy.descriptionEn = copy.description;
+            modified = true;
+          }
+
+          if (modified) neededDbUpdate = true;
+          return copy;
+        });
+
+        // Persist cleaned list back to Supabase in background if any was fixed
+        if (neededDbUpdate) {
+          supabase.from("site_settings").upsert({
+            key: "custom_media_list",
+            value: media,
+            updated_at: new Date().toISOString()
+          }).then(() => console.log("[SANITIZATION] Successfully sanitized media items in database."));
+        }
       }
     } catch (sbErr) {
       console.warn("Supabase custom-media query warning:", sbErr);
     }
   } else {
-    media = [...customUploadedMedia];
+    media = customUploadedMedia.map((item) => {
+      const copy = { ...item };
+      copy.title = cleanServerTitle(copy.title);
+      copy.titleEn = cleanServerTitle(copy.titleEn || copy.title);
+      copy.description = cleanServerDescription(copy.description);
+      copy.descriptionEn = cleanServerDescription(copy.descriptionEn || copy.description);
+      return copy;
+    });
   }
 
-  // Filter out soft-deleted videos for public view
-  const publicMedia = media.filter((item) => !softDeletedVideoIds.has(String(item.id)));
+  // Filter out soft-deleted videos
+  const activeMedia = media.filter((item) => !softDeletedVideoIds.has(String(item.id)));
+
+  // For public visitors (non-admins), strip private Google Drive delivery links and storage paths
+  const isAdmin = checkIsAdmin(req);
+  const safeMedia = activeMedia.map((item) => {
+    if (isAdmin) {
+      return item;
+    }
+    const { googleDriveLink, google_drive_link, video_storage_path, videoStoragePath, ...publicItem } = item;
+    return publicItem;
+  });
 
   res.json({
-    media: publicMedia,
+    media: safeMedia,
     hiddenVideoIds: Array.from(softDeletedVideoIds)
   });
 });
@@ -1695,28 +1841,33 @@ app.post("/api/custom-media", async (req, res) => {
       tags
     } = req.body;
 
+    const rawTitle = title ? String(title).trim() : "";
+    const rawDriveLink = googleDriveLink || (isUrlOrDriveLinkServer(rawTitle) ? rawTitle : "");
+    const safeTitle = isUrlOrDriveLinkServer(rawTitle) ? "Exclusive Masterclass Session" : (rawTitle || "Exclusive Masterclass Session");
+    const safeDesc = cleanServerDescription(description, "Exclusive video published by Queen Milana.");
+
     const storagePath = video_storage_path || videoStoragePath;
-    const finalVideoUrl = googleDriveLink || videoUrl || previewUrl || (storagePath ? `supabase://${storagePath}` : "");
-    if (!title || (!finalVideoUrl && !storagePath)) {
+    const finalVideoUrl = rawDriveLink || videoUrl || previewUrl || (storagePath ? `supabase://${storagePath}` : "");
+    if (!rawTitle || (!finalVideoUrl && !storagePath)) {
       return res.status(400).json({ error: "Title and video source or storage path are required." });
     }
 
     const newItem = {
       id: `custom-vid-${Date.now()}`,
-      title: title.trim(),
-      titleEn: title.trim(),
+      title: safeTitle,
+      titleEn: safeTitle,
       category: category ? category.trim() : "Queen Exclusive",
       categoryEn: category ? category.trim() : "Queen Exclusive",
       price: parseFloat(price) || 20.00,
       previewUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
       videoUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
-      googleDriveLink: googleDriveLink || "",
+      googleDriveLink: rawDriveLink || "",
       video_storage_path: storagePath || null,
       videoStoragePath: storagePath || null,
       thumbnailUrl: thumbnailUrl || "https://i.imgur.com/g5fQwuf.jpg",
       duration: duration || "Full length",
-      description: description || "Exclusive video published by Queen Milana.",
-      descriptionEn: description || "Exclusive video published by Queen Milana.",
+      description: safeDesc,
+      descriptionEn: safeDesc,
       tags: Array.isArray(tags) ? tags : ["new", "queenmilana", "exclusive"],
       createdAt: new Date().toISOString()
     };

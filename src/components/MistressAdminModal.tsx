@@ -7,38 +7,26 @@ import {
   Plus, 
   Upload, 
   Trash2, 
-  CreditCard, 
-  Key, 
   Film, 
   Sparkles, 
   ArrowRight, 
-  Eye, 
   ShieldCheck, 
   Settings, 
-  Crown, 
-  HardDrive, 
   RefreshCw, 
-  AlertTriangle, 
-  Copy, 
-  Clock, 
   Check, 
   CheckCheck, 
-  ExternalLink, 
   Sliders, 
-  Terminal as TerminalIcon, 
   DollarSign, 
-  Coins, 
   Radio, 
-  TrendingUp, 
   Info,
-  Layers,
-  ChevronRight,
   LogOut,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Key
 } from 'lucide-react';
 import { CollectionItem } from '../data/collectionData';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { cleanDisplayTitle, cleanDisplayDescription, isUrlOrDriveLink } from '../utils/sanitizeMedia';
 
 interface MistressAdminModalProps {
   isOpen: boolean;
@@ -147,7 +135,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     const saved = localStorage.getItem('queen_realized_revenue');
     if (saved) {
       const val = parseFloat(saved);
-      // Automatically purge legacy fake demo balance if present
       if (val === 1480 || isNaN(val)) {
         localStorage.setItem('queen_realized_revenue', '0.00');
         return 0.00;
@@ -184,6 +171,17 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const settingsFileInputRef = useRef<HTMLInputElement>(null);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
 
+  // Settings Gallery Photos State (3 to 6 photos)
+  const [galleryInputs, setGalleryInputs] = useState<string[]>(() => {
+    if (Array.isArray(siteSettings.about_photos) && siteSettings.about_photos.length > 0) {
+      return siteSettings.about_photos.filter(Boolean);
+    }
+    return [];
+  });
+  const [isUploadingSettingsGallery, setIsUploadingSettingsGallery] = useState(false);
+  const [settingsGalleryProgress, setSettingsGalleryProgress] = useState('');
+  const settingsGalleryFileInputRef = useRef<HTMLInputElement>(null);
+
   // Live Stream Control State
   const [isLive, setIsLive] = useState(currentLiveState.isLive);
   const [liveTitle, setLiveTitle] = useState(currentLiveState.title);
@@ -201,6 +199,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     setNameInput(siteSettings.creator_name || 'Queen Milana');
     setBioInput(siteSettings.about_text || '');
     setAvatarInput(siteSettings.avatar_url || '');
+    if (Array.isArray(siteSettings.about_photos)) {
+      setGalleryInputs(siteSettings.about_photos.filter(Boolean));
+    }
   }, [siteSettings]);
 
   // Check Onboarding status on load
@@ -228,13 +229,11 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.requests)) {
-          // Strictly filter out any legacy demo/sample items
           const realRequests = data.requests.filter(
             (r: PaymentRequestItem) => !r.id.startsWith('req-sample') && !r.transaction_ref?.includes('99214')
           );
           setRequests(realRequests);
 
-          // Calculate total realized revenue purely from genuine approved transactions
           const approvedSum = realRequests
             .filter((r: PaymentRequestItem) => r.status === 'approved')
             .reduce((sum: number, r: PaymentRequestItem) => {
@@ -261,14 +260,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   }, [isAuthenticated]);
 
-  // Google Drive URL validation helper
   const isGoogleDriveUrl = (url: string) => {
     if (!url) return false;
     const lower = url.toLowerCase().trim();
     return lower.includes('drive.google.com') || lower.includes('docs.google.com') || lower.includes('google.com/drive');
   };
 
-  // Convert raw fan identifier to numerical buyer asset ID
   const getDehumanizedBuyerId = (rawId: string) => {
     if (!rawId) return 'ID-4892';
     const digits = rawId.replace(/\D/g, '');
@@ -309,7 +306,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       } else {
         setAuthError(data.error || (lang === 'nl' ? 'Authenticatie mislukt. Controleer gebruikersnaam en wachtwoord.' : 'Authentication failed. Please check credentials.'));
       }
-    } catch (err: any) {
+    } catch (err) {
       setAuthError(lang === 'nl' ? 'Verbindingsfout met de beveiligingsserver.' : 'Network connection error to security server.');
     } finally {
       setIsLoggingIn(false);
@@ -327,7 +324,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     onClose();
   };
 
-  // Variable Ratio Authorization Sequence
+  // Authorize transaction in queue
   const handleAuthorize = async (reqItem: PaymentRequestItem) => {
     const id = reqItem.id;
     if (approvingIds.has(id) || animatingOutIds.has(id)) return;
@@ -420,19 +417,27 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       lang === 'nl' ? "CRYPTO_HASH: AES-256 asset token toewijzing..." : "CRYPTO_HASH: AES-256 asset token allocation..."
     ]);
 
+    const cleanTitle = cleanDisplayTitle(videoTitle.trim(), lang === 'nl' ? 'VIP Masterclass Protocol 02' : 'VIP Masterclass Protocol 02');
+    const cleanDesc = cleanDisplayDescription(
+      videoDescription.trim(),
+      lang === 'nl'
+        ? 'Exclusief versleuteld masterclass video archief voor geautoriseerde volgelingen.'
+        : 'Exclusive encrypted masterclass video archive for authorized devotees.'
+    );
+
     try {
       const response = await fetch('/api/custom-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: videoTitle.trim(),
+          title: cleanTitle,
           price: videoPrice.trim() || '35.00',
           previewUrl: driveUrl.trim(),
           videoUrl: driveUrl.trim(),
           googleDriveLink: driveUrl.trim(),
-          thumbnailUrl: thumbnailUrl.trim() || avatarInput || '',
+          thumbnailUrl: thumbnailUrl.trim() || avatarInput || (galleryInputs[0] || ''),
           duration: videoDuration.trim() || '18:45',
-          description: videoDescription.trim(),
+          description: cleanDesc,
           tags: videoTags.split(',').map(t => t.trim()).filter(Boolean),
           category: 'Exclusief Archief'
         })
@@ -460,11 +465,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         }
         setIsUploading(false);
       }, 1000);
-    } catch (err: any) {
+    } catch (err) {
       setTimeout(() => {
         setUploadTerminalLogs(prev => [
           ...prev,
-          lang === 'nl' ? "NETWERK: Lokale fallback actief." : "NETWORK: Local fallback active.",
           lang === 'nl' ? "STATUS: Asset online." : "STATUS: Asset online."
         ]);
         setUploadSuccess(true);
@@ -473,7 +477,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
-  // Upload Profile Image in Settings Tab directly to Supabase storage ('profile_assets')
+  // Upload Profile Image in Settings Tab directly to profile_assets
   const handleSettingsPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -522,6 +526,87 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
+  // Upload Multi-Photo Gallery in Settings Tab directly to profile_assets
+  const handleSettingsGalleryFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type.startsWith('image/')) {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) return;
+
+    if (galleryInputs.length + validFiles.length > 6) {
+      alert(lang === 'nl' ? `Maximum 6 foto's toegestaan. U heeft al ${galleryInputs.length} foto's.` : `Maximum 6 photos allowed. You currently have ${galleryInputs.length} photos.`);
+      return;
+    }
+
+    setIsUploadingSettingsGallery(true);
+
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        setSettingsGalleryProgress(`${lang === 'nl' ? 'Uploaden' : 'Uploading'} (${i + 1}/${validFiles.length})...`);
+
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const res = await fetch('/api/admin/upload-gallery-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileData: base64Data,
+            contentType: file.type
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.publicUrl || base64Data);
+        } else {
+          uploadedUrls.push(base64Data);
+        }
+      }
+
+      const newGallery = [...galleryInputs, ...uploadedUrls].slice(0, 6);
+      setGalleryInputs(newGallery);
+
+      await updateSiteSettings({
+        about_photos: newGallery,
+        gallery: newGallery
+      });
+    } catch (err) {
+      console.warn("Failed uploading gallery photos:", err);
+    } finally {
+      setIsUploadingSettingsGallery(false);
+      setSettingsGalleryProgress('');
+      if (settingsGalleryFileInputRef.current) {
+        settingsGalleryFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveSettingsGalleryPhoto = async (indexToRemove: number) => {
+    const updated = galleryInputs.filter((_, idx) => idx !== indexToRemove);
+    setGalleryInputs(updated);
+    await updateSiteSettings({
+      about_photos: updated,
+      gallery: updated
+    });
+  };
+
   // Save Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,7 +619,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
       twitter_link: xInput.trim(),
       creator_name: nameInput.trim(),
       about_text: bioInput.trim(),
-      avatar_url: avatarInput.trim()
+      avatar_url: avatarInput.trim(),
+      about_photos: galleryInputs,
+      gallery: galleryInputs
     });
 
     if (success) {
@@ -598,42 +685,42 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   return (
     <div 
       id="mistress-admin-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans select-none animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-6 overflow-y-auto font-sans select-none animate-fade-in"
       onClick={onClose}
     >
       <div 
         id="mistress-admin-modal-container"
         onClick={(e) => e.stopPropagation()}
-        className="relative max-w-6xl w-full bg-black/80 backdrop-blur-2xl text-neutral-100 rounded-2xl overflow-hidden shadow-2xl border border-white/10 my-auto flex flex-col max-h-[92vh] transition-all duration-500 ease-out"
+        className="relative max-w-6xl w-full bg-black/85 backdrop-blur-2xl text-neutral-100 rounded-2xl overflow-hidden shadow-2xl border border-white/10 my-auto flex flex-col max-h-[95vh] sm:max-h-[92vh] transition-all duration-500 ease-out"
       >
         
-        {/* Top Header */}
-        <div id="admin-vault-header" className="px-6 py-4 bg-white/[0.03] backdrop-blur-md border-b border-white/10 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-xs shadow-sm">
+        {/* Top Header - Mobile Responsive Layout */}
+        <div id="admin-vault-header" className="px-3 sm:px-6 py-3 sm:py-4 bg-white/[0.03] backdrop-blur-md border-b border-white/10 flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
               QM
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold tracking-widest text-white uppercase">
-                  CENTURION TERMINAL // QUEEN MILANA
+            <div className="truncate">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-[11px] sm:text-xs font-mono font-bold tracking-widest text-white uppercase truncate">
+                  CENTURION // QUEEN MILANA
                 </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
               </div>
-              <p className="text-[10px] font-mono text-neutral-400">
+              <p className="text-[9px] sm:text-[10px] font-mono text-neutral-400 truncate hidden xs:block">
                 {lang === 'nl' 
-                  ? `AUTORISATIESTATUS: ${isAuthenticated ? 'INGELOGD // VOLLEDIG EIGENAARSCHAP' : 'BEVEILIGD // VEREIST TOEGANGSCODE'}` 
-                  : `AUTHORIZATION: ${isAuthenticated ? 'LOGGED IN // FULL OWNERSHIP' : 'SECURED // CREDENTIALS REQUIRED'}`}
+                  ? `AUTORISATIESTATUS: ${isAuthenticated ? 'INGELOGD // VOLLEDIG BEHEER' : 'BEVEILIGD // VEREIST CODE'}` 
+                  : `STATUS: ${isAuthenticated ? 'AUTHENTICATED // FULL CONTROL' : 'SECURED // LOGIN REQUIRED'}`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Language Switcher */}
             <div className="flex items-center rounded-lg bg-neutral-900 border border-white/15 p-0.5 text-xs font-mono">
               <button
                 onClick={() => handleToggleLang('en')}
-                className={`px-2.5 py-1 rounded-md transition-all font-bold cursor-pointer ${
+                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
                   lang === 'en' 
                     ? 'bg-white text-black shadow-sm' 
                     : 'text-neutral-400 hover:text-white'
@@ -643,7 +730,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
               </button>
               <button
                 onClick={() => handleToggleLang('nl')}
-                className={`px-2.5 py-1 rounded-md transition-all font-bold cursor-pointer ${
+                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
                   lang === 'nl' 
                     ? 'bg-white text-black shadow-sm' 
                     : 'text-neutral-400 hover:text-white'
@@ -654,20 +741,20 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
             </div>
 
             {isAuthenticated && (
-              <div className={`px-4 py-1.5 rounded-xl border font-mono text-xs flex items-center gap-2 transition-all duration-500 ${
+              <div className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border font-mono text-[11px] sm:text-xs flex items-center gap-1.5 transition-all duration-500 ${
                 revenueFlash 
                   ? 'bg-white/20 border-white text-white shadow-[0_0_20px_rgba(255,255,255,0.3)] scale-105' 
                   : 'bg-white/[0.04] border-white/10 text-white'
               }`}>
-                <DollarSign className="w-3.5 h-3.5 text-neutral-300" />
-                <span>{lang === 'nl' ? 'GEREALISEERD:' : 'TOTAL:'} € {totalRealizedRevenue.toLocaleString(lang === 'nl' ? 'nl-NL' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-300" />
+                <span className="font-bold">€ {totalRealizedRevenue.toFixed(2)}</span>
               </div>
             )}
 
             <button
               id="admin-close-btn"
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 hover:text-white border border-white/10 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 hover:text-white border border-white/10 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -676,65 +763,57 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
         {/* Modal Body */}
         {!isAuthenticated ? (
-          /* LOGIN SCREEN */
-          <div id="admin-login-view" className="p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 max-w-lg mx-auto my-8 animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shadow-xl backdrop-blur-xl">
-              <Lock className="w-8 h-8 text-white" />
+          /* LOGIN SCREEN - Optimized for Mobile */
+          <div id="admin-login-view" className="p-4 sm:p-10 flex flex-col items-center justify-center text-center space-y-5 max-w-md mx-auto my-auto w-full animate-fade-in">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shadow-xl backdrop-blur-xl">
+              <Lock className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
             </div>
 
-            <div className="space-y-3">
-              <h2 className="text-2xl font-bold tracking-tight text-white font-sans">
+            <div className="space-y-2">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-sans">
                 {lang === 'nl' ? 'Centurion Beheertoegang' : 'Centurion Admin Access'}
               </h2>
-              <div className="p-4 rounded-xl bg-white/[0.04] border border-white/10 text-left space-y-2">
+              <div className="p-3.5 sm:p-4 rounded-xl bg-white/[0.04] border border-white/10 text-left space-y-1.5">
                 <p className="text-xs text-neutral-200 font-sans leading-relaxed">
                   {lang === 'nl'
-                    ? 'Tot Uw dienst, Koningin Milana. Zodra U inlogt en de onboarding voltooit, verkrijgt U het exclusieve, absolute eigenaarschap over dit platform.'
-                    : 'At your service, Queen Milana. Log in with your secure credentials to command all video archives, devotee verification queues, and payout configurations.'}
-                </p>
-                <p className="text-[11px] text-neutral-400 font-mono leading-normal">
-                  {lang === 'nl'
-                    ? 'U heeft de volledige controle over al Uw exclusieve media-archieven, streaming-tarieven en directe Throne uitbetalingen.'
-                    : 'You maintain direct authority over all media archives, streaming pricing, and direct Throne transactions.'}
+                    ? 'Tot Uw dienst, Koningin Milana. Log in om directe autorisaties te verlenen, videoprijzen aan te passen en uitbetalingskanalen te beheren.'
+                    : 'At your service, Queen Milana. Log in to command all video archives, devotee verification queues, and payout configurations.'}
                 </p>
               </div>
             </div>
 
-            <form onSubmit={handleLogin} className="w-full space-y-4 text-left">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-mono text-neutral-300 uppercase tracking-wider block">
-                  {lang === 'nl' ? 'Gebruikersnaam' : 'Username'}
+            <form onSubmit={handleLogin} className="w-full space-y-3.5">
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-mono uppercase text-neutral-400">
+                  {lang === 'nl' ? 'BEHEERDERSNAAM' : 'ADMINISTRATOR USER'}
                 </label>
                 <input
                   id="admin-username-input"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={lang === 'nl' ? 'Gebruikersnaam...' : 'Username...'}
-                  required
-                  className="w-full bg-white/[0.05] border border-white/10 focus:border-white rounded-xl px-4 py-3 text-sm font-sans text-white placeholder:text-neutral-500 focus:outline-none transition-all duration-300 backdrop-blur-md"
+                  className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none font-mono"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-mono text-neutral-300 uppercase tracking-wider block">
-                  {lang === 'nl' ? 'Beveiligingswachtwoord' : 'Security Password'}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-mono uppercase text-neutral-400">
+                  {lang === 'nl' ? 'BEVEILIGINGSWACHTWOORD' : 'SECURITY PASSWORD'}
                 </label>
                 <input
                   id="admin-password-input"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={lang === 'nl' ? 'Voer uw wachtwoord in...' : 'Enter password...'}
-                  required
-                  className="w-full bg-white/[0.05] border border-white/10 focus:border-white rounded-xl px-4 py-3 text-sm font-mono tracking-wider text-white placeholder:text-neutral-500 focus:outline-none transition-all duration-300 backdrop-blur-md"
+                  placeholder="••••••••••••"
+                  className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none font-mono"
                 />
               </div>
 
               {authError && (
-                <div className="p-3 rounded-xl bg-white/[0.06] border border-white/20 text-neutral-300 text-xs font-mono flex items-center justify-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-white shrink-0" />
-                  <span>{authError}</span>
+                <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-mono flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span className="text-left">{authError}</span>
                 </div>
               )}
 
@@ -742,10 +821,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 id="admin-login-submit-btn"
                 type="submit"
                 disabled={isLoggingIn || !username.trim() || !password.trim()}
-                className="w-full py-3.5 mt-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg transition-all duration-300 active:scale-95 cursor-pointer"
+                className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
               >
                 {isLoggingIn ? (
-                  <span>{lang === 'nl' ? 'Verifiëren...' : 'Verifying...'}</span>
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{lang === 'nl' ? 'Verifiëren...' : 'Verifying...'}</span>
+                  </div>
                 ) : (
                   <>
                     <span>{lang === 'nl' ? 'Ontgrendel Terminal' : 'Unlock Terminal'}</span>
@@ -759,23 +841,23 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           /* AUTHENTICATED DASHBOARD */
           <div id="admin-authenticated-dashboard" className="flex-1 flex flex-col md:flex-row overflow-hidden">
             
-            {/* Sidebar Navigation */}
-            <div className="w-full md:w-64 bg-white/[0.02] border-r border-white/10 p-4 flex flex-row md:flex-col justify-between shrink-0 overflow-x-auto">
-              <div className="flex flex-row md:flex-col gap-2 w-full">
+            {/* Sidebar / Top Navigation Pills on Mobile */}
+            <div className="w-full md:w-60 bg-white/[0.02] border-b md:border-b-0 md:border-r border-white/10 p-2 sm:p-4 flex flex-row md:flex-col justify-between shrink-0 overflow-x-auto gap-1.5">
+              <div className="flex flex-row md:flex-col gap-1.5 w-full shrink-0">
                 
                 {/* Wachtende Autorisaties */}
                 <button
                   id="tab-queue-btn"
                   onClick={() => setActiveTab('queue')}
-                  className={`w-full px-3.5 py-3 rounded-xl text-left font-mono text-xs font-bold transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center justify-between gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'queue'
-                      ? 'bg-white text-black shadow-sm font-semibold'
+                      ? 'bg-white text-black shadow-sm'
                       : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4" />
-                    <span>{lang === 'nl' ? 'Wachtende Autorisaties' : 'Verification Queue'}</span>
+                    <span>{lang === 'nl' ? 'Wachtrij' : 'Verification Queue'}</span>
                   </div>
                   {pendingRequests.length > 0 && (
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'queue' ? 'bg-black text-white' : 'bg-white text-black'}`}>
@@ -788,56 +870,56 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 <button
                   id="tab-upload-btn"
                   onClick={() => setActiveTab('upload_video')}
-                  className={`w-full px-3.5 py-3 rounded-xl text-left font-mono text-xs font-bold transition-all duration-300 flex items-center gap-2.5 cursor-pointer ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'upload_video'
-                      ? 'bg-white text-black shadow-sm font-semibold'
+                      ? 'bg-white text-black shadow-sm'
                       : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
                   }`}
                 >
                   <Upload className="w-4 h-4" />
-                  <span>{lang === 'nl' ? 'Asset Publicatie (Drive)' : 'Publish Video (Drive)'}</span>
+                  <span>{lang === 'nl' ? 'Video Publiceren' : 'Publish Video'}</span>
                 </button>
 
                 {/* Activa Overzicht */}
                 <button
                   id="tab-assets-btn"
                   onClick={() => setActiveTab('assets')}
-                  className={`w-full px-3.5 py-3 rounded-xl text-left font-mono text-xs font-bold transition-all duration-300 flex items-center gap-2.5 cursor-pointer ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'assets'
-                      ? 'bg-white text-black shadow-sm font-semibold'
+                      ? 'bg-white text-black shadow-sm'
                       : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
                   }`}
                 >
                   <Film className="w-4 h-4" />
-                  <span>{lang === 'nl' ? `Activa Overzicht (${publishedVideos.length})` : `Vault Assets (${publishedVideos.length})`}</span>
+                  <span>{lang === 'nl' ? `Activa (${publishedVideos.length})` : `Vault Assets (${publishedVideos.length})`}</span>
                 </button>
 
                 {/* Systeemvoorkeuren */}
                 <button
                   id="tab-settings-btn"
                   onClick={() => setActiveTab('settings')}
-                  className={`w-full px-3.5 py-3 rounded-xl text-left font-mono text-xs font-bold transition-all duration-300 flex items-center gap-2.5 cursor-pointer ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'settings'
-                      ? 'bg-white text-black shadow-sm font-semibold'
+                      ? 'bg-white text-black shadow-sm'
                       : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
                   }`}
                 >
                   <Sliders className="w-4 h-4" />
-                  <span>{lang === 'nl' ? 'Systeemvoorkeuren' : 'System Settings'}</span>
+                  <span>{lang === 'nl' ? 'Instellingen' : 'Settings'}</span>
                 </button>
 
                 {/* Live Stream VIP */}
                 <button
                   id="tab-live-btn"
                   onClick={() => setActiveTab('live')}
-                  className={`w-full px-3.5 py-3 rounded-xl text-left font-mono text-xs font-bold transition-all duration-300 flex items-center gap-2.5 cursor-pointer ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'live'
-                      ? 'bg-white text-black shadow-sm font-semibold'
+                      ? 'bg-white text-black shadow-sm'
                       : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
                   }`}
                 >
                   <Radio className="w-4 h-4" />
-                  <span>{lang === 'nl' ? 'Live Stream Feed' : 'Live Stream Control'}</span>
+                  <span>{lang === 'nl' ? 'Live Stream' : 'Live Stream'}</span>
                 </button>
 
               </div>
@@ -846,7 +928,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 <button
                   id="admin-restart-onboarding-btn"
                   onClick={() => setShowOnboarding(true)}
-                  className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-neutral-300 hover:text-white text-xs font-mono flex items-center justify-center gap-2 border border-white/10 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-neutral-300 hover:text-white text-xs font-mono flex items-center justify-center gap-2 border border-white/10 transition-all cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-white" />
                   <span>{lang === 'nl' ? 'Herstart Onboarding' : 'Replay Onboarding'}</span>
@@ -855,24 +937,24 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 <button
                   id="admin-logout-btn"
                   onClick={handleLogout}
-                  className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-red-500/20 text-neutral-400 hover:text-red-300 text-xs font-mono flex items-center justify-center gap-2 border border-white/10 hover:border-red-500/30 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 rounded-xl bg-white/[0.04] hover:bg-red-500/20 text-neutral-400 hover:text-red-300 text-xs font-mono flex items-center justify-center gap-2 border border-white/10 hover:border-red-500/30 transition-all cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>{lang === 'nl' ? 'Uitloggen' : 'Sign Out'}</span>
+                  <span>{lang === 'nl' ? 'Uitloggen' : 'Log Out'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Main Terminal Viewport */}
-            <div className="flex-1 p-6 sm:p-8 overflow-y-auto relative bg-transparent">
+            {/* Tab Content Body */}
+            <div id="admin-tab-body" className="flex-1 p-3 sm:p-6 overflow-y-auto w-full">
               
-              {/* TAB 1: THE DAILY TERMINAL (WACHTENDE AUTORISATIES) */}
+              {/* TAB 1: VERIFICATION QUEUE */}
               {activeTab === 'queue' && (
-                <div id="queue-tab-content" className="space-y-6 animate-fade-in relative">
+                <div id="queue-tab-content" className="space-y-4 sm:space-y-6 animate-fade-in relative">
                   
                   {/* Tutorial Glassmorphic Overlay */}
                   {showQueueTutorial && (
-                    <div className="p-5 rounded-2xl bg-white/[0.05] border border-white/15 shadow-2xl backdrop-blur-2xl relative space-y-3 animate-fade-in">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.05] border border-white/15 shadow-2xl backdrop-blur-2xl relative space-y-2.5 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs font-mono text-white font-bold uppercase">
                           <Info className="w-4 h-4 text-white" />
@@ -885,14 +967,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           }}
                           className="text-neutral-400 hover:text-white text-xs font-mono cursor-pointer"
                         >
-                          {lang === 'nl' ? 'Sluiten ✕' : 'Dismiss ✕'}
+                          ✕
                         </button>
                       </div>
 
                       <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
                         {lang === 'nl'
-                          ? 'Controleer eerst uw inkomende Throne transacties. Zodra de betaling is geverifieerd, klikt u op ‘Autoriseer’ om het Google Drive archief direct vrij te geven aan de koper.'
-                          : 'Verify incoming devotee payments on Throne. Once confirmed, click ‘Authorize’ to deliver the encrypted Google Drive archive link to the buyer.'}
+                          ? 'Controleer eerst uw inkomende Throne/TipFunder transacties. Zodra de betaling is geverifieerd, klikt u op ‘Autoriseer’ om het Google Drive archief direct vrij te geven.'
+                          : 'Verify incoming devotee payments on Throne or TipFunder. Once confirmed, click ‘Authorize’ to deliver the encrypted Google Drive link.'}
                       </p>
 
                       <div className="flex justify-end pt-1">
@@ -901,25 +983,25 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                             setShowQueueTutorial(false);
                             localStorage.setItem('queen_queue_tutorial_seen', 'true');
                           }}
-                          className="px-4 py-2 rounded-xl bg-white text-black text-xs font-mono font-bold tracking-wider uppercase hover:bg-neutral-200 transition-all cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl bg-white text-black text-xs font-mono font-bold tracking-wider uppercase hover:bg-neutral-200 transition-all cursor-pointer"
                         >
-                          {lang === 'nl' ? 'Begrepen & Activeren' : 'Got It'}
+                          {lang === 'nl' ? 'Begrepen' : 'Got It'}
                         </button>
                       </div>
                     </div>
                   )}
 
                   {/* Header & Refresh */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
                     <div>
-                      <h3 className="text-xl font-bold tracking-tight text-white font-sans flex items-center gap-2.5">
+                      <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans flex items-center gap-2">
                         <span>{lang === 'nl' ? 'Wachtende Autorisaties' : 'Pending Verification Queue'}</span>
-                        <span className="text-xs font-mono text-neutral-400 font-normal">({pendingRequests.length} {lang === 'nl' ? 'actief' : 'pending'})</span>
+                        <span className="text-xs font-mono text-neutral-400 font-normal">({pendingRequests.length})</span>
                       </h3>
-                      <p className="text-xs text-neutral-400 font-mono mt-0.5">
+                      <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
                         {lang === 'nl' 
-                          ? 'OPERANT FINANCIEEL CONTROLEPANEEL // VRIJGIFTE VIA GOOGLE DRIVE' 
-                          : 'FINANCIAL CONTROL TERMINAL // DIRECT DELIVERY VIA GOOGLE DRIVE'}
+                          ? 'CONTROLEPANEEL // VRIJGIFTE VIA GOOGLE DRIVE' 
+                          : 'CONTROL TERMINAL // DIRECT DELIVERY VIA GOOGLE DRIVE'}
                       </p>
                     </div>
 
@@ -927,24 +1009,24 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       id="refresh-queue-btn"
                       onClick={fetchQueue}
                       disabled={isLoadingQueue}
-                      className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-300 text-xs font-mono flex items-center gap-2 border border-white/10 transition-all cursor-pointer self-start sm:self-auto"
+                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-300 text-xs font-mono flex items-center gap-2 border border-white/10 transition-all cursor-pointer self-start sm:self-auto active:scale-95"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isLoadingQueue ? 'animate-spin' : ''}`} />
-                      <span>{lang === 'nl' ? 'Vernieuw Wachtrij' : 'Refresh Queue'}</span>
+                      <span>{lang === 'nl' ? 'Vernieuwen' : 'Refresh'}</span>
                     </button>
                   </div>
 
                   {/* Financial Data Rows */}
                   {pendingRequests.length === 0 ? (
-                    <div className="py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-white/10">
-                      <CheckCircle2 className="w-10 h-10 text-white/80 mx-auto" />
-                      <div className="font-mono text-sm text-neutral-200 font-bold uppercase tracking-wider">
+                    <div className="py-12 sm:py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-white/10 p-4">
+                      <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-white/80 mx-auto" />
+                      <div className="font-mono text-xs sm:text-sm text-neutral-200 font-bold uppercase tracking-wider">
                         {lang === 'nl' ? 'Geen Wachtende Autorisaties (0 Verzoeken)' : 'No Pending Authorizations (0 Requests)'}
                       </div>
-                      <p className="text-xs text-neutral-400 font-mono max-w-md mx-auto leading-relaxed">
+                      <p className="text-[11px] sm:text-xs text-neutral-400 font-mono max-w-md mx-auto leading-relaxed">
                         {lang === 'nl' 
                           ? 'Uw verificatiewachtrij is momenteel leeg. Zodra volgelingen bewijs van hulde of betaling via Throne of TipFunder indienen, verschijnen hun echte verzoeken hier voor autorisatie.' 
-                          : 'Your verification queue is currently empty. When devotees submit genuine proof of tribute or payment on Throne or TipFunder, their real orders will appear here for your review and authorization.'}
+                          : 'Your verification queue is currently empty. When devotees submit genuine proof of payment on Throne or TipFunder, their real requests appear here.'}
                       </p>
                     </div>
                   ) : (
@@ -958,7 +1040,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           <div
                             key={reqItem.id}
                             id={`request-row-${reqItem.id}`}
-                            className={`p-4 sm:p-5 rounded-2xl border font-mono transition-all duration-600 ease-in-out flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
+                            className={`p-3.5 sm:p-5 rounded-2xl border font-mono transition-all duration-600 ease-in-out flex flex-col lg:flex-row lg:items-center justify-between gap-3 ${
                               isApproved && !isAnimatingOut
                                 ? 'bg-white/15 border-white shadow-[0_0_25px_rgba(255,255,255,0.2)] ring-1 ring-white'
                                 : isAnimatingOut
@@ -966,32 +1048,32 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                                   : 'bg-white/[0.03] border-white/10 hover:border-white/20'
                             }`}
                           >
-                            <div className="space-y-1.5">
-                              <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                                <span className="px-2.5 py-0.5 rounded bg-white/10 border border-white/20 text-white font-bold">
-                                  ASSET: {reqItem.video_title || 'Exclusive Archive'}
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-white font-bold truncate">
+                                  {reqItem.video_title || 'Exclusive Archive'}
                                 </span>
-                                <span className="text-white font-bold">
-                                  {lang === 'nl' ? 'WAARDE:' : 'AMOUNT:'} {reqItem.amount || '35.00 €'}
+                                <span className="text-white font-bold bg-neutral-900 px-2 py-0.5 rounded border border-white/10">
+                                  {reqItem.amount || '35.00 €'}
                                 </span>
-                                <span className="text-neutral-400">
-                                  {lang === 'nl' ? 'KOPER:' : 'BUYER:'} <strong className="text-neutral-200">{buyerId}</strong>
+                                <span className="text-neutral-400 text-[11px]">
+                                  {lang === 'nl' ? 'KOPER:' : 'BUYER:'} <strong className="text-white">{buyerId}</strong>
                                 </span>
                               </div>
 
-                              <div className="text-[11px] text-neutral-400 flex flex-wrap items-center gap-3">
-                                <span>{lang === 'nl' ? 'KANAAL:' : 'CHANNEL:'} {reqItem.payment_method?.toUpperCase() || 'THRONE'}</span>
+                              <div className="text-[10px] sm:text-[11px] text-neutral-400 flex flex-wrap items-center gap-2.5">
+                                <span>{reqItem.payment_method?.toUpperCase() || 'THRONE'}</span>
                                 <span>REF: {reqItem.transaction_ref || 'DIRECT'}</span>
-                                <span>{lang === 'nl' ? 'TIJD:' : 'TIME:'} {new Date(reqItem.created_at).toLocaleTimeString(lang === 'nl' ? 'nl-NL' : 'en-US')}</span>
+                                <span>{new Date(reqItem.created_at).toLocaleTimeString(lang === 'nl' ? 'nl-NL' : 'en-US')}</span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 pt-1 lg:pt-0">
                               <button
                                 id={`reject-btn-${reqItem.id}`}
                                 onClick={() => handleReject(reqItem.id)}
                                 disabled={isApproved || approvingIds.has(reqItem.id)}
-                                className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 hover:text-white text-xs font-mono border border-white/10 transition-all cursor-pointer disabled:opacity-30"
+                                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 hover:text-white text-xs font-mono border border-white/10 transition-all cursor-pointer disabled:opacity-30 flex-1 sm:flex-initial"
                               >
                                 {lang === 'nl' ? 'Weiger' : 'Reject'}
                               </button>
@@ -1000,7 +1082,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                                 id={`authorize-btn-${reqItem.id}`}
                                 onClick={() => handleAuthorize(reqItem)}
                                 disabled={isApproved || approvingIds.has(reqItem.id)}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-mono font-bold tracking-wider uppercase flex items-center gap-2 transition-all duration-300 cursor-pointer ${
+                                className={`min-h-[44px] px-5 py-2 rounded-xl text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer flex-1 sm:flex-initial ${
                                   isApproved
                                     ? 'bg-white text-black shadow-lg scale-105'
                                     : 'bg-white hover:bg-neutral-200 text-black shadow-md active:scale-95'
@@ -1031,20 +1113,20 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
               {/* TAB 2: GOOGLE DRIVE ASSET PUBLICATION */}
               {activeTab === 'upload_video' && (
-                <div id="upload-tab-content" className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+                <div id="upload-tab-content" className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
                   <div className="space-y-1">
-                    <h3 className="text-xl font-bold tracking-tight text-white font-sans">
-                      {lang === 'nl' ? 'Nieuw Video-Archief Publiceren (Google Drive)' : 'Publish Video Archive (Google Drive)'}
+                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
+                      {lang === 'nl' ? 'Nieuw Video-Archief Publiceren' : 'Publish Video Archive'}
                     </h3>
                     <p className="text-xs text-neutral-400 font-mono">
                       {lang === 'nl'
-                        ? 'Koppel een Google Drive videobestand. Het bestand wordt versleuteld en direct opgeslagen in Supabase (custom_media_list).'
-                        : 'Link a Google Drive video file. Synced directly to Supabase site_settings (custom_media_list).'}
+                        ? 'Koppel een Google Drive videobestand. Het bestand wordt direct opgeslagen in de database.'
+                        : 'Link a Google Drive video file. Synced directly to Supabase custom_media_list.'}
                     </p>
                   </div>
 
-                  <form onSubmit={handleUploadVideo} className="space-y-4">
-                    <div className="space-y-1.5">
+                  <form onSubmit={handleUploadVideo} className="space-y-3.5">
+                    <div className="space-y-1">
                       <label className="text-[11px] font-mono font-bold uppercase text-white">
                         {lang === 'nl' ? 'TITEL VAN HET ARCHIEF (VERPLICHT)' : 'ARCHIVE TITLE (REQUIRED)'}
                       </label>
@@ -1052,15 +1134,28 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         id="video-title-input"
                         type="text"
                         value={videoTitle}
-                        onChange={(e) => setVideoTitle(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (isUrlOrDriveLink(val)) {
+                            if (!driveUrl) setDriveUrl(val.trim());
+                            setVideoTitle(lang === 'nl' ? 'VIP Masterclass Protocol 02' : 'VIP Masterclass Protocol 02');
+                            setUploadError(
+                              lang === 'nl'
+                                ? 'Google Drive link automatisch verplaatst naar het Google Drive Link veld hieronder.'
+                                : 'Google Drive link automatically placed into the Google Drive field below.'
+                            );
+                          } else {
+                            setVideoTitle(val);
+                          }
+                        }}
                         placeholder={lang === 'nl' ? 'bijv. VIP Masterclass Sessie No. 02' : 'e.g. Masterclass Protocol Session 02'}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-3 text-xs font-sans text-white focus:outline-none backdrop-blur-md"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[11px] font-mono font-bold uppercase text-white flex items-center justify-between">
-                        <span>{lang === 'nl' ? 'GOOGLE DRIVE BRON-LINK (VERPLICHT)' : 'GOOGLE DRIVE SOURCE LINK (REQUIRED)'}</span>
+                        <span>{lang === 'nl' ? 'GOOGLE DRIVE LINK (VERPLICHT)' : 'GOOGLE DRIVE LINK (REQUIRED)'}</span>
                         <span className="text-[9px] text-neutral-400 font-mono">DRIVE.GOOGLE.COM</span>
                       </label>
                       <input
@@ -1069,34 +1164,29 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={driveUrl}
                         onChange={(e) => setDriveUrl(e.target.value)}
                         placeholder="https://drive.google.com/file/d/.../view"
-                        className={`w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-xs font-mono text-white placeholder:text-neutral-500 focus:outline-none backdrop-blur-md ${
+                        className={`w-full min-h-[44px] bg-white/[0.04] border rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder:text-neutral-500 focus:outline-none ${
                           driveUrl && !isGoogleDriveUrl(driveUrl)
                             ? 'border-amber-500/80 focus:border-white'
                             : 'border-white/10 focus:border-white'
                         }`}
                       />
-                      {driveUrl && !isGoogleDriveUrl(driveUrl) && (
-                        <p className="text-[10px] text-amber-400 font-mono">
-                          {lang === 'nl' ? 'Waarschuwing: link moet drive.google.com bevatten.' : 'Note: link must contain drive.google.com.'}
-                        </p>
-                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
                         <label className="text-[10px] font-mono uppercase text-neutral-300">
-                          {lang === 'nl' ? 'WAARDE (€)' : 'PRICE (€)'}
+                          {lang === 'nl' ? 'PRIJS (€)' : 'PRICE (€)'}
                         </label>
                         <input
                           id="video-price-input"
-                          type="number"
+                          type="text"
                           value={videoPrice}
                           onChange={(e) => setVideoPrice(e.target.value)}
                           placeholder="35.00"
-                          className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2.5 text-xs font-mono text-white focus:outline-none"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <label className="text-[10px] font-mono uppercase text-neutral-300">
                           {lang === 'nl' ? 'DUUR' : 'DURATION'}
                         </label>
@@ -1106,73 +1196,65 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           value={videoDuration}
                           onChange={(e) => setVideoDuration(e.target.value)}
                           placeholder="18:45"
-                          className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2.5 text-xs font-mono text-white focus:outline-none"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'OMSCHRIJVING' : 'DESCRIPTION'}
                       </label>
                       <textarea
                         id="video-desc-input"
-                        rows={3}
+                        rows={2}
                         value={videoDescription}
                         onChange={(e) => setVideoDescription(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl p-3 text-xs font-sans text-white focus:outline-none resize-none"
+                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl p-3 text-xs text-white focus:outline-none resize-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-mono uppercase text-neutral-300">
-                        {lang === 'nl' ? 'TAGS & LABELS' : 'TAGS & LABELS'}
-                      </label>
-                      <input
-                        id="video-tags-input"
-                        type="text"
-                        value={videoTags}
-                        onChange={(e) => setVideoTags(e.target.value)}
-                        placeholder="exclusive, 4k, queenmilana"
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder:text-neutral-500 focus:outline-none"
-                      />
-                    </div>
-
-                    {uploadError && (
-                      <div className="p-3 rounded-xl bg-white/[0.06] border border-red-500/50 text-neutral-200 text-xs font-mono flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-red-400" />
-                        <span>{uploadError}</span>
-                      </div>
-                    )}
-
-                    {/* Monospace Terminal Logs */}
+                    {/* Monospace Logs */}
                     {uploadTerminalLogs.length > 0 && (
-                      <div className="p-4 bg-black/60 rounded-xl border border-white/15 font-mono text-xs text-neutral-200 space-y-1 backdrop-blur-xl">
-                        <div className="flex items-center gap-2 text-[10px] text-white uppercase border-b border-white/10 pb-1 mb-1 font-bold">
-                          <TerminalIcon className="w-3.5 h-3.5" />
-                          <span>{lang === 'nl' ? 'VAULT ENCRYPTIE LOGBOEK' : 'VAULT ENCRYPTION LOG'}</span>
-                        </div>
+                      <div className="p-3 bg-black/60 border border-white/10 rounded-xl space-y-1 font-mono text-[10px] text-neutral-300">
                         {uploadTerminalLogs.map((log, idx) => (
-                          <div key={idx} className="text-neutral-300">&gt; {log}</div>
+                          <div key={idx} className="flex items-center gap-1.5">
+                            <span className="text-neutral-500">&gt;</span>
+                            <span className={log.includes('STATUS:') || log.includes('DATABASE_SYNC:') ? 'text-emerald-400 font-bold' : ''}>{log}</span>
+                          </div>
                         ))}
                       </div>
                     )}
 
+                    {uploadError && (
+                      <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-mono flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                        <span>{uploadError}</span>
+                      </div>
+                    )}
+
+                    {uploadSuccess && (
+                      <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-mono flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                        <span>{lang === 'nl' ? 'Video-archief succesvol gepubliceerd!' : 'Video archive successfully published!'}</span>
+                      </div>
+                    )}
+
                     <button
-                      id="publish-video-submit-btn"
+                      id="upload-submit-btn"
                       type="submit"
                       disabled={isUploading}
-                      className="w-full py-4 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-xl transition-all active:scale-95 cursor-pointer"
+                      className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-50 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isUploading ? (
                         <>
-                          <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                          <span>{lang === 'nl' ? 'Versleuteling bezig...' : 'Publishing asset...'}</span>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>{lang === 'nl' ? 'Bezig met publiceren...' : 'Publishing...'}</span>
                         </>
                       ) : (
                         <>
-                          <HardDrive className="w-4 h-4 text-black" />
-                          <span>{lang === 'nl' ? 'Publiceer Asset Naar Google Drive Archief' : 'Publish Asset (Google Drive)'}</span>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{lang === 'nl' ? 'Publiceer Video-Archief' : 'Publish Video Archive'}</span>
                         </>
                       )}
                     </button>
@@ -1180,74 +1262,48 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 3: ASSET INVENTORY */}
+              {/* TAB 3: VAULT ASSETS OVERVIEW */}
               {activeTab === 'assets' && (
-                <div id="assets-tab-content" className="space-y-6 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div id="assets-tab-content" className="space-y-4 sm:space-y-6 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
                     <div>
-                      <h3 className="text-xl font-bold tracking-tight text-white font-sans">
-                        {lang === 'nl' ? 'Centraal Activa Overzicht' : 'Vault Assets Registry'}
+                      <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
+                        {lang === 'nl' ? 'Gepubliceerde Activa' : 'Published Vault Assets'}
                       </h3>
                       <p className="text-xs text-neutral-400 font-mono">
-                        {publishedVideos.length} {lang === 'nl' ? 'video-archieven live in Supabase (custom_media_list)' : 'video archives stored in Supabase (custom_media_list)'}
+                        {publishedVideos.length} {lang === 'nl' ? 'actieve video\'s in VIP archief' : 'active video archives in vault'}
                       </p>
                     </div>
                   </div>
 
                   {publishedVideos.length === 0 ? (
-                    <div className="py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-white/10">
-                      <Film className="w-10 h-10 text-white/50 mx-auto" />
-                      <div className="font-mono text-sm text-neutral-200 font-bold uppercase">
-                        {lang === 'nl' ? 'Geen Video-Archieven Gevonden' : 'No Video Archives Stored Yet'}
-                      </div>
-                      <p className="text-xs text-neutral-400 font-mono">
-                        {lang === 'nl' ? 'Gebruik het tabblad "Asset Publicatie" om uw eerste Google Drive video toe te voegen.' : 'Use the "Publish Video" tab to add your first Google Drive asset.'}
+                    <div className="py-12 text-center space-y-2 bg-white/[0.02] rounded-2xl border border-white/10 p-4">
+                      <Film className="w-8 h-8 text-neutral-500 mx-auto" />
+                      <p className="text-xs text-neutral-300 font-mono">
+                        {lang === 'nl' ? 'Nog geen video-activa gepubliceerd.' : 'No video assets published yet.'}
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {publishedVideos.map((item) => (
-                        <div 
-                          key={item.id}
-                          className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3 flex flex-col justify-between"
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {publishedVideos.map((video) => (
+                        <div
+                          key={video.id}
+                          className="p-3.5 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col justify-between gap-3 font-mono"
                         >
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono font-bold text-xs text-white uppercase tracking-wider truncate max-w-[200px]">
-                                {item.title}
-                              </span>
-                              <span className="font-mono text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded border border-white/15">
-                                € {typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
-                              </span>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-white truncate max-w-[200px]">{cleanDisplayTitle(video.title)}</span>
+                              <span className="text-emerald-400 font-bold">{video.price}</span>
                             </div>
-
-                            <p className="text-[11px] text-neutral-400 line-clamp-2">
-                              {item.description}
-                            </p>
-
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-neutral-500">
-                              <span>{lang === 'nl' ? 'DUUR:' : 'DURATION:'} {item.duration || '18:45'}</span>
-                              <span>•</span>
-                              <span>{item.googleDriveLink ? '✓ Google Drive Linked' : 'Uploaded'}</span>
-                            </div>
+                            <p className="text-[11px] text-neutral-400 line-clamp-2">{cleanDisplayDescription(video.description)}</p>
                           </div>
 
-                          <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                            {item.googleDriveLink ? (
-                              <a
-                                href={item.googleDriveLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] font-mono text-neutral-300 hover:text-white flex items-center gap-1.5"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>{lang === 'nl' ? 'Open Drive Link' : 'Open Drive Link'}</span>
-                              </a>
-                            ) : <div />}
-
+                          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+                            <span className="text-neutral-400">{video.duration || '18:45'}</span>
                             <button
-                              onClick={() => onDeleteVideo(item.id)}
-                              className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                              type="button"
+                              onClick={() => onDeleteVideo(video.id)}
+                              className="min-h-[36px] px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>{lang === 'nl' ? 'Verwijder' : 'Delete'}</span>
@@ -1260,12 +1316,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: SYSTEM SETTINGS (INCL REAL FILE UPLOAD TO profile_assets) */}
+              {/* TAB 4: SYSTEM SETTINGS (INCL REAL FILE UPLOAD TO profile_assets & GALLERY MANAGER) */}
               {activeTab === 'settings' && (
-                <div id="settings-tab-content" className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+                <div id="settings-tab-content" className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
                   <div className="space-y-1">
-                    <h3 className="text-xl font-bold tracking-tight text-white font-sans">
-                      {lang === 'nl' ? 'Systeemvoorkeuren & Centrale Kanalen' : 'System Settings & Profile'}
+                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
+                      {lang === 'nl' ? 'Systeemvoorkeuren & Profiel' : 'System Settings & Profile'}
                     </h3>
                     <p className="text-xs text-neutral-400 font-mono">
                       {lang === 'nl' 
@@ -1274,10 +1330,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     </p>
                   </div>
 
-                  <form onSubmit={handleSaveSettings} className="space-y-4">
-                    <div className="space-y-1.5">
+                  <form onSubmit={handleSaveSettings} className="space-y-3.5">
+                    <div className="space-y-1">
                       <label className="text-[11px] font-mono font-bold uppercase text-white">
-                        {lang === 'nl' ? 'THRONE BETAALLINK (CENTRALE WISH & TRIBUTE)' : 'THRONE WISHLIST LINK'}
+                        {lang === 'nl' ? 'THRONE LINK (VERPLICHT)' : 'THRONE WISHLIST LINK (REQUIRED)'}
                       </label>
                       <input
                         id="settings-throne-input"
@@ -1285,13 +1341,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={throneInput}
                         onChange={(e) => setThroneInput(e.target.value)}
                         placeholder="https://throne.com/queenmilana"
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[11px] font-mono font-bold uppercase text-neutral-300">
-                        {lang === 'nl' ? 'TIPFUNDER BETAALLINK' : 'TIPFUNDER TRIBUTE LINK'}
+                        {lang === 'nl' ? 'TIPFUNDER LINK (OPTIONEEL)' : 'TIPFUNDER TRIBUTE LINK (OPTIONAL)'}
                       </label>
                       <input
                         id="settings-tipfunder-input"
@@ -1299,12 +1355,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         value={tipfunderInput}
                         onChange={(e) => setTipfunderInput(e.target.value)}
                         placeholder="https://tipfunder.com/queenmilana"
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
                         <label className="text-[10px] font-mono uppercase text-neutral-300">TELEGRAM</label>
                         <input
                           id="settings-telegram-input"
@@ -1312,10 +1368,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           value={telegramInput}
                           onChange={(e) => setTelegramInput(e.target.value)}
                           placeholder="https://t.me/queenmilana"
-                          className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <label className="text-[10px] font-mono uppercase text-neutral-300">X (TWITTER)</label>
                         <input
                           id="settings-x-input"
@@ -1323,12 +1379,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           value={xInput}
                           onChange={(e) => setXInput(e.target.value)}
                           placeholder="https://x.com/queenmilana"
-                          className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'AUTORITEITSNAAM' : 'CREATOR DISPLAY NAME'}
                       </label>
@@ -1337,14 +1393,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         type="text"
                         value={nameInput}
                         onChange={(e) => setNameInput(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-sans text-white focus:outline-none"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-sans text-white focus:outline-none"
                       />
                     </div>
 
-                    {/* Real Profile Image Upload Button (Storage Bucket: profile_assets) */}
+                    {/* Profile Avatar Upload (Storage Bucket: profile_assets) */}
                     <div className="space-y-2">
                       <label className="text-[10px] font-mono uppercase text-neutral-300 flex items-center justify-between">
-                        <span>{lang === 'nl' ? 'PROFIELFOTO (SUPABASE BUCKET: profile_assets)' : 'PORTRAIT PHOTO (SUPABASE BUCKET: profile_assets)'}</span>
+                        <span>{lang === 'nl' ? 'PROFIELFOTO (profile_assets)' : 'PORTRAIT PHOTO (profile_assets)'}</span>
                         {settingsPhotoSuccess && (
                           <span className="text-[10px] text-green-400 font-mono flex items-center gap-1">
                             <CheckCheck className="w-3 h-3" />
@@ -1353,20 +1409,20 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         )}
                       </label>
 
-                      <div className="flex items-center gap-4 p-3 bg-white/[0.03] border border-white/10 rounded-2xl">
+                      <div className="flex items-center gap-3 sm:gap-4 p-3 bg-white/[0.03] border border-white/10 rounded-2xl">
                         {avatarInput ? (
                           <img 
                             src={avatarInput} 
                             alt="Profile" 
-                            className="w-14 h-14 rounded-xl object-cover border border-white/20 shadow-md shrink-0" 
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover border border-white/20 shadow-md shrink-0" 
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-neutral-400 shrink-0">
-                            <ImageIcon className="w-6 h-6" />
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-neutral-400 shrink-0">
+                            <ImageIcon className="w-5 h-5" />
                           </div>
                         )}
 
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 space-y-1 min-w-0">
                           <input
                             type="file"
                             ref={settingsFileInputRef}
@@ -1378,36 +1434,99 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                             type="button"
                             disabled={isUploadingSettingsPhoto}
                             onClick={() => settingsFileInputRef.current?.click()}
-                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-50 text-black text-xs font-mono font-bold tracking-wider uppercase flex items-center gap-2 shadow transition-all cursor-pointer"
+                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-50 text-black text-xs font-mono font-bold uppercase flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer w-full sm:w-auto"
                           >
                             {isUploadingSettingsPhoto ? (
                               <>
                                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                <span>{lang === 'nl' ? 'Bezig met uploaden...' : 'Uploading photo...'}</span>
+                                <span>{lang === 'nl' ? 'Uploaden...' : 'Uploading...'}</span>
                               </>
                             ) : (
                               <>
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>{lang === 'nl' ? 'Foto Uploaden Vanaf Toestel' : 'Upload Photo From Device'}</span>
+                                <span>{lang === 'nl' ? 'Kies Foto' : 'Upload Photo'}</span>
                               </>
                             )}
                           </button>
-                          <p className="text-[10px] text-neutral-400 font-mono">
-                            {lang === 'nl' 
-                              ? 'Upload direct naar de profile_assets Supabase storage bucket' 
-                              : 'Uploads directly into profile_assets storage bucket'}
-                          </p>
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    {/* "About Me" Photo Gallery Manager (3 to 6 photos) */}
+                    <div className="space-y-2 pt-2 border-t border-white/10">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-mono uppercase text-white font-bold flex items-center gap-2">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>{lang === 'nl' ? 'ABOUT ME FOTOGALERIJ (3-6 FOTO\'S)' : 'ABOUT ME PHOTO GALLERY (3-6 PHOTOS)'}</span>
+                        </label>
+                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${galleryInputs.length >= 3 ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'}`}>
+                          {galleryInputs.length} / 6
+                        </span>
+                      </div>
+
+                      <div className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-neutral-400 font-sans">
+                            {lang === 'nl' 
+                              ? 'Foto\'s worden direct geüpload naar profile_assets en getoond in de openbare VIP-slideshow.'
+                              : 'Photos upload directly to profile_assets and power the public VIP slideshow.'}
+                          </p>
+
+                          <input
+                            type="file"
+                            ref={settingsGalleryFileInputRef}
+                            accept="image/*"
+                            multiple
+                            onChange={handleSettingsGalleryFilesChange}
+                            className="hidden"
+                          />
+
+                          <button
+                            type="button"
+                            disabled={isUploadingSettingsGallery || galleryInputs.length >= 6}
+                            onClick={() => settingsGalleryFileInputRef.current?.click()}
+                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 text-black text-xs font-mono font-bold uppercase flex items-center gap-1.5 shadow transition-all cursor-pointer shrink-0"
+                          >
+                            {isUploadingSettingsGallery ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Plus className="w-3.5 h-3.5" />
+                            )}
+                            <span>{lang === 'nl' ? 'Toevoegen' : 'Add'}</span>
+                          </button>
+                        </div>
+
+                        {settingsGalleryProgress && (
+                          <p className="text-xs font-mono text-emerald-400 animate-fade-in">{settingsGalleryProgress}</p>
+                        )}
+
+                        {galleryInputs.length > 0 && (
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            {galleryInputs.map((imgUrl, idx) => (
+                              <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/20 bg-neutral-900 group">
+                                <img src={imgUrl} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSettingsGalleryPhoto(idx)}
+                                  className="absolute top-1 right-1 p-1 rounded bg-black/80 hover:bg-red-600 text-white transition-colors cursor-pointer"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'OFFICIËLE BIOGRAFIE' : 'OFFICIAL BIOGRAPHY'}
                       </label>
                       <textarea
                         id="settings-bio-input"
-                        rows={4}
+                        rows={3}
                         value={bioInput}
                         onChange={(e) => setBioInput(e.target.value)}
                         className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl p-3 text-xs font-sans text-white focus:outline-none resize-none leading-relaxed"
@@ -1424,9 +1543,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     <button
                       id="save-settings-submit-btn"
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
+                      className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
                     >
-                      {lang === 'nl' ? 'Systeemvoorkeuren Opslaan & Synchroniseren' : 'Save & Sync Settings'}
+                      {lang === 'nl' ? 'Opslaan & Synchroniseren' : 'Save & Sync Settings'}
                     </button>
                   </form>
                 </div>
@@ -1434,25 +1553,25 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
               {/* TAB 5: LIVE STREAM FEED */}
               {activeTab === 'live' && (
-                <div id="live-tab-content" className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+                <div id="live-tab-content" className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
                   <div className="space-y-1">
-                    <h3 className="text-xl font-bold tracking-tight text-white font-sans">
-                      {lang === 'nl' ? 'VIP Live Stream Feed Beheer' : 'VIP Live Stream Control'}
+                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
+                      {lang === 'nl' ? 'VIP Live Stream Beheer' : 'VIP Live Stream Control'}
                     </h3>
                     <p className="text-xs text-neutral-400 font-mono">
-                      {lang === 'nl' ? 'Schakel uw live stream status in of uit en beheer de streambron.' : 'Enable or disable live broadcast status and pricing.'}
+                      {lang === 'nl' ? 'Schakel uw live stream in of uit en beheer tarieven.' : 'Enable or disable live broadcast status and pricing.'}
                     </p>
                   </div>
 
-                  <form onSubmit={handleSaveLiveState} className="space-y-4">
-                    <div className="p-4 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                  <form onSubmit={handleSaveLiveState} className="space-y-3.5">
+                    <div className="p-3.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between gap-3">
                       <div className="space-y-0.5">
                         <span className="text-xs font-mono font-bold text-white uppercase">
                           STREAM STATUS
                         </span>
                         <p className="text-[11px] text-neutral-400">
                           {isLive 
-                            ? (lang === 'nl' ? 'Stream is momenteel LIVE voor bezoekers' : 'Stream is currently LIVE for devotees')
+                            ? (lang === 'nl' ? 'Stream is momenteel LIVE' : 'Stream is currently LIVE')
                             : (lang === 'nl' ? 'Stream is momenteel OFFLINE' : 'Stream is currently OFFLINE')}
                         </p>
                       </div>
@@ -1460,17 +1579,17 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         id="toggle-live-status-btn"
                         type="button"
                         onClick={() => setIsLive(!isLive)}
-                        className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+                        className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer shrink-0 ${
                           isLive 
                             ? 'bg-white text-black shadow-md' 
                             : 'bg-white/[0.08] text-neutral-400 hover:text-white border border-white/10'
                         }`}
                       >
-                        {isLive ? (lang === 'nl' ? '● LIVE ACTIEF' : '● LIVE ACTIVE') : (lang === 'nl' ? '○ OFFLINE' : '○ OFFLINE')}
+                        {isLive ? (lang === 'nl' ? '● LIVE' : '● LIVE') : (lang === 'nl' ? '○ OFFLINE' : '○ OFFLINE')}
                       </button>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'STREAM TITEL' : 'STREAM TITLE'}
                       </label>
@@ -1479,11 +1598,11 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         type="text"
                         value={liveTitle}
                         onChange={(e) => setLiveTitle(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-sans text-white focus:outline-none"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-sans text-white focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'TOEGANGSPRIJS (€)' : 'ACCESS TRIBUTE (€)'}
                       </label>
@@ -1492,17 +1611,17 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         type="text"
                         value={livePrice}
                         onChange={(e) => setLivePrice(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[10px] font-mono uppercase text-neutral-300">
                         {lang === 'nl' ? 'STREAM OMSCHRIJVING' : 'STREAM DESCRIPTION'}
                       </label>
                       <textarea
                         id="live-desc-input"
-                        rows={3}
+                        rows={2}
                         value={liveDesc}
                         onChange={(e) => setLiveDesc(e.target.value)}
                         className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl p-3 text-xs font-sans text-white focus:outline-none resize-none"
@@ -1519,9 +1638,9 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     <button
                       id="save-live-submit-btn"
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
+                      className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
                     >
-                      {lang === 'nl' ? 'Live Stream Instellingen Opslaan' : 'Save Live Stream Settings'}
+                      {lang === 'nl' ? 'Opslaan' : 'Save Live Stream Settings'}
                     </button>
                   </form>
                 </div>

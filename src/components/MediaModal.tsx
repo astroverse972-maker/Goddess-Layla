@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle2, ExternalLink, HardDrive, Play, Gift } from 'lucide-react';
+import { X, CheckCircle2, ExternalLink, HardDrive, Play, Gift, Lock, ShieldCheck } from 'lucide-react';
 import { CollectionItem } from '../data/collectionData';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { cleanDisplayTitle, cleanDisplayDescription, isUrlOrDriveLink } from '../utils/sanitizeMedia';
 
 interface MediaModalProps {
   item: CollectionItem | null;
@@ -56,8 +57,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         if (verifyData.downloadUrl || verifyData.streamUrl) {
           setSignedDownloadUrl(verifyData.downloadUrl || verifyData.streamUrl);
         }
-        if (verifyData.googleDriveUrl || item.googleDriveLink) {
-          setGoogleDriveDeliveryUrl(verifyData.googleDriveUrl || item.googleDriveLink || null);
+        if (verifyData.googleDriveUrl || (item as any).googleDriveLink) {
+          setGoogleDriveDeliveryUrl(verifyData.googleDriveUrl || (item as any).googleDriveLink || null);
         }
         setIsVerifying(false);
         return;
@@ -74,7 +75,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
           paymentMethod: 'Throne Direct',
           transactionRef: ref,
           videoId: item.id,
-          videoTitle: item.titleEn || item.title,
+          videoTitle: cleanDisplayTitle(item.titleEn || item.title),
           amount: `${item.price.toFixed(2)} €`
         })
       });
@@ -103,7 +104,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
       window.addEventListener('keydown', handleKeyDown);
       setIsMuted(true);
       setSignedDownloadUrl(null);
-      setGoogleDriveDeliveryUrl(item.googleDriveLink || null);
+      setGoogleDriveDeliveryUrl(null);
       
       const savedToken = localStorage.getItem(`unlocked_media_${item.id}`);
       if (savedToken) {
@@ -117,8 +118,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
               if (data.downloadUrl || data.streamUrl) {
                 setSignedDownloadUrl(data.downloadUrl || data.streamUrl);
               }
-              if (data.googleDriveUrl || item.googleDriveLink) {
-                setGoogleDriveDeliveryUrl(data.googleDriveUrl || item.googleDriveLink || null);
+              if (data.googleDriveUrl || (item as any).googleDriveLink) {
+                setGoogleDriveDeliveryUrl(data.googleDriveUrl || (item as any).googleDriveLink || null);
               }
             }
           })
@@ -140,8 +141,18 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
 
   if (!isOpen || !item) return null;
 
-  const title = item.titleEn || item.title;
-  const description = item.descriptionEn || item.description;
+  // Clean, high-status sanitized title and description
+  const title = cleanDisplayTitle(item.titleEn || item.title, 'Exclusive Masterclass Archive');
+  const description = cleanDisplayDescription(
+    item.descriptionEn || item.description,
+    'Exclusive encrypted masterclass video archive for authorized devotees.'
+  );
+
+  const isDrivePreview = isUrlOrDriveLink(item.previewUrl);
+  const canPlayDirectVideo = Boolean(
+    signedDownloadUrl || 
+    (item.previewUrl && !isDrivePreview && (item.previewUrl.endsWith('.mp4') || item.previewUrl.endsWith('.webm') || item.previewUrl.includes('catbox')))
+  );
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -180,35 +191,71 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
           </button>
         </div>
 
-        {/* Video Player */}
+        {/* Video Player / Preview Area */}
         <div className="relative aspect-video w-full bg-black overflow-hidden group">
-          <video
-            ref={videoRef}
-            key={`${item.id}-${signedDownloadUrl ? 'full' : 'preview'}`}
-            poster={item.thumbnailUrl}
-            controls
-            controlsList="nodownload"
-            onContextMenu={(e) => e.preventDefault()}
-            autoPlay
-            loop
-            muted={isMuted}
-            playsInline
-            preload="auto"
-            referrerPolicy="no-referrer"
-            crossOrigin="anonymous"
-            className="w-full h-full object-contain"
-          >
-            <source src={signedDownloadUrl || item.previewUrl} type="video/mp4" referrerPolicy="no-referrer" />
-          </video>
+          {canPlayDirectVideo ? (
+            <>
+              <video
+                ref={videoRef}
+                key={`${item.id}-${signedDownloadUrl ? 'full' : 'preview'}`}
+                poster={item.thumbnailUrl}
+                controls
+                controlsList="nodownload"
+                onContextMenu={(e) => e.preventDefault()}
+                autoPlay
+                loop
+                muted={isMuted}
+                playsInline
+                preload="auto"
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                className="w-full h-full object-contain"
+              >
+                <source src={signedDownloadUrl || item.previewUrl} type="video/mp4" referrerPolicy="no-referrer" />
+              </video>
 
-          {/* Sound Toggle Floating Overlay Button */}
-          {isMuted && (
-            <button
-              onClick={toggleMute}
-              className="absolute top-4 right-4 z-20 px-4 py-2 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-lg backdrop-blur-md transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
-            >
-              <span>Enable Sound</span>
-            </button>
+              {/* Sound Toggle Floating Overlay Button */}
+              {isMuted && (
+                <button
+                  onClick={toggleMute}
+                  className="absolute top-4 right-4 z-20 px-4 py-2 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-lg backdrop-blur-md transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+                >
+                  <span>Enable Sound</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="relative w-full h-full bg-neutral-950 flex items-center justify-center overflow-hidden">
+              {item.thumbnailUrl ? (
+                <img
+                  src={item.thumbnailUrl}
+                  alt={title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover brightness-75 filter blur-[1px]"
+                />
+              ) : null}
+
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/60 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-xl">
+                  {unlocked ? (
+                    <ShieldCheck className="w-7 h-7 text-white" />
+                  ) : (
+                    <Lock className="w-7 h-7 text-white" />
+                  )}
+                </div>
+                <div className="space-y-1 max-w-md">
+                  <span className="text-[11px] font-mono tracking-widest text-white/70 uppercase">
+                    {unlocked ? 'ARCHIVE UNLOCKED' : 'ENCRYPTED MASTERCLASS ASSET'}
+                  </span>
+                  <h4 className="text-lg font-bold text-white tracking-tight">{title}</h4>
+                  <p className="text-xs text-neutral-300 font-normal">
+                    {unlocked 
+                      ? 'Payment verified. Click below to open and stream your complete Google Drive archive.' 
+                      : 'Full high-definition Google Drive delivery is unlocked upon payment confirmation.'}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
@@ -224,7 +271,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              {item.tags.map((tag) => (
+              {(item.tags || ['exclusive', '4k', 'queenmilana']).map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1 rounded-full bg-gray-100 text-black text-xs font-semibold border border-gray-200/80"
