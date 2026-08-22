@@ -70,15 +70,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 }) => {
   const { siteSettings, updateSiteSettings } = useSiteSettings();
 
-  // Language State (Default: 'en' English, with toggle to 'nl' Dutch)
-  const [lang, setLang] = useState<'en' | 'nl'>(() => {
-    return (localStorage.getItem('admin_lang') as 'en' | 'nl') || 'en';
-  });
-
-  const handleToggleLang = (newLang: 'en' | 'nl') => {
-    setLang(newLang);
-    localStorage.setItem('admin_lang', newLang);
-  };
+  // Admin Interface is locked to Dutch (Nederlands)
+  const lang: 'nl' = 'nl';
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -716,29 +709,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Language Switcher */}
-            <div className="flex items-center rounded-lg bg-neutral-900 border border-white/15 p-0.5 text-xs font-mono">
-              <button
-                onClick={() => handleToggleLang('en')}
-                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
-                  lang === 'en' 
-                    ? 'bg-white text-black shadow-sm' 
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => handleToggleLang('nl')}
-                className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
-                  lang === 'nl' 
-                    ? 'bg-white text-black shadow-sm' 
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                NL
-              </button>
-            </div>
 
             {isAuthenticated && (
               <div className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border font-mono text-[11px] sm:text-xs flex items-center gap-1.5 transition-all duration-500 ${

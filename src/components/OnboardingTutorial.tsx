@@ -49,15 +49,8 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
 }) => {
   const { updateSiteSettings } = useSiteSettings();
 
-  // Language State (Defaults to English with instant Dutch toggle)
-  const [lang, setLang] = useState<'en' | 'nl'>(() => {
-    return (localStorage.getItem('admin_lang') as 'en' | 'nl') || 'en';
-  });
-
-  const handleToggleLang = (newLang: 'en' | 'nl') => {
-    setLang(newLang);
-    localStorage.setItem('admin_lang', newLang);
-  };
+  // Onboarding Tutorial is locked to Dutch (Nederlands)
+  const lang: 'nl' = 'nl';
 
   // 5 Active Steps:
   // 1: Payment Routing (Throne & TipFunder)
@@ -448,30 +441,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          {/* Language Switcher */}
-          <div className="flex items-center rounded-lg bg-neutral-900 border border-white/15 p-0.5 text-xs font-mono">
-            <button
-              onClick={() => handleToggleLang('en')}
-              className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
-                lang === 'en' 
-                  ? 'bg-white text-black shadow-sm' 
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => handleToggleLang('nl')}
-              className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md transition-all font-bold cursor-pointer text-[11px] ${
-                lang === 'nl' 
-                  ? 'bg-white text-black shadow-sm' 
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              NL
-            </button>
-          </div>
-
           <div className="flex items-center gap-1 text-[11px] sm:text-xs font-mono text-neutral-400 bg-neutral-900 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/10">
             <span className="text-white font-bold">
               {lang === 'nl' ? `STAP ${currentStep}` : `STEP ${currentStep}`}
