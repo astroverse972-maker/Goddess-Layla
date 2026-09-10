@@ -199,7 +199,7 @@ export const TheCollection: React.FC<TheCollectionProps> = ({
       {filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {filteredItems.map((item) => {
-            const title = cleanDisplayTitle(item.titleEn || item.title, 'Exclusive Masterclass Archive');
+            const title = cleanDisplayTitle(item.titleEn || item.title, 'Video Archive');
             const category = item.categoryEn || item.category;
 
             return (
@@ -225,10 +225,10 @@ export const TheCollection: React.FC<TheCollectionProps> = ({
             <Lock className="w-6 h-6" />
           </div>
           <h3 className="font-bold text-lg text-black">
-            Exclusive Sanctuary Collection
+            Video Collection
           </h3>
           <p className="text-xs sm:text-sm text-gray-600 font-medium max-w-md mx-auto leading-relaxed">
-            Exclusive sessions will be uploaded here directly by Goddess Milana. Check back soon or visit the VIP sanctuary.
+            New videos will appear here once published by Goddess Luzia. Check back soon for updates.
           </p>
         </div>
       )}

@@ -8,7 +8,7 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = () => {
   const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
   const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
   const throneLink = siteSettings.throne_link || paymentSettings.throne;
   const xLink = siteSettings.twitter_link || paymentSettings.x;
@@ -27,7 +27,7 @@ export const Footer: React.FC<FooterProps> = () => {
               {creatorName}
             </div>
             <p className="text-xs text-gray-700 font-medium mt-0.5">
-              Official VIP Sanctuary • All Rights Reserved
+              Official Website • All Rights Reserved
             </p>
           </div>
 
@@ -51,7 +51,7 @@ export const Footer: React.FC<FooterProps> = () => {
                 rel="noreferrer"
                 className="hover:bg-gray-200 transition-colors bg-gray-100 text-black px-4 py-2 rounded-full border border-gray-200 flex items-center gap-1"
               >
-                <span>TipFunder Tribute</span>
+                <span>TipFunder</span>
               </a>
             )}
             {xLink && (
@@ -90,13 +90,13 @@ export const Footer: React.FC<FooterProps> = () => {
             </span>
           </div>
           <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed font-normal">
-            This website and exclusive digital archives are strictly intended for adults aged 18 and older. By accessing this platform, you certify that you are of legal age in your jurisdiction. All media, video transactions, and trademarks are protected under international copyright and intellectual property laws.
+            This website and digital media are strictly intended for adults aged 18 and older. By accessing this platform, you certify that you are of legal age in your jurisdiction. All media and video purchases are protected under applicable copyright and intellectual property laws.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium border-t border-gray-100 pt-4">
           <div className="select-none cursor-default">
-            © {new Date().getFullYear()} {creatorName}. All rights reserved. VIP 18+.
+            © {new Date().getFullYear()} {creatorName}. All rights reserved. 18+.
           </div>
         </div>
 

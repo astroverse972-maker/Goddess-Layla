@@ -24,11 +24,11 @@ export const TributePortal: React.FC = () => {
 
     const newLog: DevotionLog = {
       id: `dev-${Date.now()}`,
-      devoteeName: devoteeName.trim() || 'Anonymous Devotee',
+      devoteeName: devoteeName.trim() || 'Anonymous Supporter',
       amount: customAmount,
       timestamp: 'Just now',
-      message: tributeMessage.trim() || 'Silent Tribute offered with utmost respect.',
-      badge: 'Interactive Devotee'
+      message: tributeMessage.trim() || 'Sent support.',
+      badge: 'Supporter'
     };
 
     setLogs([newLog, ...logs]);
@@ -48,15 +48,15 @@ export const TributePortal: React.FC = () => {
         
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-rose-200">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-neutral-200">
             <Coins className="w-3.5 h-3.5 text-amber-300" />
-            <span>Honors & Devotion</span>
+            <span>Support & Wishlist</span>
           </div>
           <h2 className="font-sans text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
-            TRIBUTE PORTAL & WISHLIST
+            SUPPORT & WISHLIST
           </h2>
           <p className="text-neutral-400 text-sm max-w-xl mx-auto font-normal">
-            Tribute demonstrates honor and unlocks priority attention. Choose from direct payment channels, wishlist fulfillment, or present a silent tribute.
+            Choose from direct payment channels, wishlist items, or send a note of support.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export const TributePortal: React.FC = () => {
             <div className="space-y-1">
               <span className="text-xs font-mono text-emerald-400 uppercase">CashApp Tag</span>
               <h4 className="font-sans font-bold text-lg text-white">{SOCIAL_LINKS.cashapp}</h4>
-              <p className="text-xs text-neutral-400 font-normal">Direct instant cash drain & consultation tribute.</p>
+              <p className="text-xs text-neutral-400 font-normal">Direct support via CashApp.</p>
             </div>
             <button
               onClick={() => handleCopy(SOCIAL_LINKS.cashapp, 'cashapp')}
@@ -82,9 +82,9 @@ export const TributePortal: React.FC = () => {
           {/* Throne Wishlist */}
           <div className="liquid-card p-6 rounded-3xl flex flex-col justify-between space-y-4">
             <div className="space-y-1">
-              <span className="text-xs font-mono text-rose-300 uppercase">Throne Wishlist</span>
+              <span className="text-xs font-mono text-neutral-300 uppercase">Throne Wishlist</span>
               <h4 className="font-sans font-bold text-lg text-white">Official Wishlist</h4>
-              <p className="text-xs text-neutral-400 font-normal">100% privacy-protected gift fulfillment.</p>
+              <p className="text-xs text-neutral-400 font-normal">Direct gift fulfillment via Throne.</p>
             </div>
             <a
               href={SOCIAL_LINKS.throne}
@@ -92,7 +92,7 @@ export const TributePortal: React.FC = () => {
               rel="noreferrer"
               className="w-full py-2.5 btn-liquid-gold text-neutral-950 font-bold rounded-full text-xs font-mono uppercase flex items-center justify-center gap-1.5"
             >
-              <span>Fulfill Gift</span>
+              <span>View Wishlist</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -100,9 +100,9 @@ export const TributePortal: React.FC = () => {
           {/* Crypto Vault */}
           <div className="liquid-card p-6 rounded-3xl flex flex-col justify-between space-y-4">
             <div className="space-y-1">
-              <span className="text-xs font-mono text-amber-300 uppercase">Crypto Ledger</span>
-              <h4 className="font-sans font-bold text-lg text-white">BTC / ETH Vault</h4>
-              <p className="text-xs text-neutral-400 font-normal">High-value anonymous cryptocurrency tributes.</p>
+              <span className="text-xs font-mono text-amber-300 uppercase">Cryptocurrency</span>
+              <h4 className="font-sans font-bold text-lg text-white">BTC / ETH Address</h4>
+              <p className="text-xs text-neutral-400 font-normal">Direct cryptocurrency support.</p>
             </div>
             <button
               onClick={() => handleCopy('0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'crypto')}
@@ -118,7 +118,7 @@ export const TributePortal: React.FC = () => {
             <div className="space-y-1">
               <span className="text-xs font-mono text-neutral-400 uppercase">Inquiries Email</span>
               <h4 className="font-sans font-bold text-lg text-white">Direct Contact</h4>
-              <p className="text-xs text-neutral-400 font-normal">Formal inquiries with proof of tribute.</p>
+              <p className="text-xs text-neutral-400 font-normal">General questions and inquiries.</p>
             </div>
             <button
               onClick={() => handleCopy(SOCIAL_LINKS.email, 'email')}
@@ -133,8 +133,8 @@ export const TributePortal: React.FC = () => {
 
         {/* Wishlist Items Showcase */}
         <div className="space-y-4 pt-4">
-          <h3 className="font-sans font-bold text-xl text-white border-l-2 border-rose-400 pl-3">
-            Active Sanctuary Wishlist Items
+          <h3 className="font-sans font-bold text-xl text-white border-l-2 border-amber-400 pl-3">
+            Wishlist Items
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -167,33 +167,33 @@ export const TributePortal: React.FC = () => {
           </div>
         </div>
 
-        {/* Interactive Silent Tribute Form & Devotion Feed */}
+        {/* Interactive Support Form & Feed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
           
           {/* Interactive Form */}
           <div className="liquid-card p-6 sm:p-8 rounded-3xl space-y-4 border border-white/20">
             <div className="flex items-center gap-2">
               <Gift className="w-5 h-5 text-amber-300" />
-              <h3 className="font-sans font-bold text-lg text-white">Offer Silent Tribute</h3>
+              <h3 className="font-sans font-bold text-lg text-white">Send a Message of Support</h3>
             </div>
             <p className="text-xs text-neutral-400 font-normal">
-              Submit a quick simulated devotion record to appear on the official Devotion Feed.
+              Send a note of appreciation to appear on the public feed.
             </p>
 
             <form onSubmit={handleSimulateTribute} className="space-y-4">
               <div>
-                <label className="text-[11px] font-mono text-rose-300 uppercase">Devotee Name / Pseudonym</label>
+                <label className="text-[11px] font-mono text-neutral-300 uppercase">Your Name / Handle</label>
                 <input
                   type="text"
                   value={devoteeName}
                   onChange={(e) => setDevoteeName(e.target.value)}
-                  placeholder="e.g. Submissive #9021 or Anonymous"
+                  placeholder="e.g. Alex or Anonymous"
                   className="w-full liquid-input rounded-2xl px-4 py-3 text-xs text-white mt-1 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-mono text-rose-300 uppercase">Tribute Amount ($USD)</label>
+                <label className="text-[11px] font-mono text-neutral-300 uppercase">Amount ($USD)</label>
                 <div className="flex gap-2 mt-1">
                   {[25, 50, 100, 250].map((amt) => (
                     <button
@@ -213,12 +213,12 @@ export const TributePortal: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-mono text-rose-300 uppercase">Devotion Message</label>
+                <label className="text-[11px] font-mono text-neutral-300 uppercase">Message</label>
                 <textarea
                   rows={2}
                   value={tributeMessage}
                   onChange={(e) => setTributeMessage(e.target.value)}
-                  placeholder="Express your respect or gratitude..."
+                  placeholder="Write a message..."
                   className="w-full liquid-input rounded-2xl p-4 text-xs text-white mt-1 focus:outline-none"
                 />
               </div>
@@ -228,12 +228,12 @@ export const TributePortal: React.FC = () => {
                 className="w-full py-3.5 btn-liquid-gold text-neutral-950 font-mono text-xs uppercase font-bold rounded-full shadow-lg flex items-center justify-center gap-2 animate-shimmer-sheen overflow-hidden"
               >
                 <Send className="w-4 h-4" />
-                <span>Submit Devotion Record</span>
+                <span>Submit Message</span>
               </button>
 
               {submittedTribute && (
                 <div className="p-3.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs rounded-2xl text-center font-mono">
-                  Devotion recorded! Thank you for honoring Maitresse Aria.
+                  Message submitted. Thank you for your support!
                 </div>
               )}
             </form>
@@ -243,8 +243,8 @@ export const TributePortal: React.FC = () => {
           <div className="liquid-card p-6 sm:p-8 rounded-3xl space-y-4 border border-white/20 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-sans font-bold text-lg text-white">Devotion Ticker Log</h3>
-                <span className="text-[10px] font-mono text-rose-300 uppercase">Live Feed</span>
+                <h3 className="font-sans font-bold text-lg text-white">Recent Support</h3>
+                <span className="text-[10px] font-mono text-neutral-300 uppercase">Live Feed</span>
               </div>
 
               <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
@@ -252,11 +252,11 @@ export const TributePortal: React.FC = () => {
                   <div key={log.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-sans font-bold text-white">{log.devoteeName}</span>
-                      <span className="font-mono text-rose-300 font-bold">${log.amount}</span>
+                      <span className="font-mono text-amber-300 font-bold">${log.amount}</span>
                     </div>
                     <p className="text-xs text-neutral-300 font-normal italic">"{log.message}"</p>
                     <div className="flex justify-between items-center text-[10px] font-mono text-neutral-400 pt-1">
-                      <span>{log.badge || 'Verified Devotee'}</span>
+                      <span>{log.badge || 'Supporter'}</span>
                       <span>{log.timestamp}</span>
                     </div>
                   </div>

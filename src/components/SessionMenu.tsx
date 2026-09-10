@@ -47,15 +47,15 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
         
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-rose-200">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-neutral-200">
             <Crown className="w-3.5 h-3.5 text-amber-300" />
-            <span>Consultation & Offerings</span>
+            <span>Bookings & Pricing</span>
           </div>
           <h2 className="font-sans text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
-            SESSION MENU & CALCULATOR
+            SESSION OPTIONS & CALCULATOR
           </h2>
           <p className="text-neutral-400 text-sm max-w-xl mx-auto font-normal">
-            Select your desired tier or utilize the live calculator to estimate tribute requirements for bespoke sessions.
+            Choose a session type or use the calculator below to get an estimated cost for custom requests.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
               >
                 {offering.popular && (
                   <div className="absolute -top-3.5 right-6 btn-liquid-gold text-neutral-950 font-mono text-[10px] font-bold uppercase tracking-widest px-3.5 py-1 rounded-full shadow-lg">
-                    Popular Protocol
+                    Popular
                   </div>
                 )}
 
@@ -109,7 +109,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
                   </div>
 
                   <div className="flex items-baseline gap-2">
-                    <span className="font-mono text-3xl font-extrabold text-rose-300">${offering.price}</span>
+                    <span className="font-mono text-3xl font-extrabold text-neutral-200">${offering.price}</span>
                     <span className="text-xs text-neutral-400 font-mono">/ {offering.duration}</span>
                   </div>
 
@@ -119,7 +119,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
 
                   {/* Features */}
                   <div className="space-y-2 pt-3 border-t border-white/10">
-                    <div className="text-[11px] font-mono text-rose-300 uppercase tracking-wider">Features Included:</div>
+                    <div className="text-[11px] font-mono text-neutral-300 uppercase tracking-wider">Features Included:</div>
                     <ul className="space-y-2">
                       {offering.features.map((feat, idx) => (
                         <li key={idx} className="flex items-center gap-2 text-xs text-neutral-300">
@@ -137,10 +137,10 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
                     className={`w-full py-3 rounded-full font-mono text-xs uppercase tracking-wider font-semibold transition-all flex items-center justify-center gap-2 ${
                       isSelected
                         ? 'btn-liquid-gold text-neutral-950 font-bold shadow-lg'
-                        : 'btn-liquid-primary text-rose-200'
+                        : 'btn-liquid-primary text-neutral-200'
                     }`}
                   >
-                    <span>{isSelected ? 'Active in Calculator' : 'Select Offering'}</span>
+                    <span>{isSelected ? 'Active in Calculator' : 'Select Session'}</span>
                   </button>
                 </div>
               </div>
@@ -156,8 +156,8 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
               <Calculator className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-sans text-xl font-bold text-white">Live Session Tribute Calculator</h3>
-              <p className="text-xs text-neutral-400">Customize duration and add-ons to preview exact tribute requirements.</p>
+              <h3 className="font-sans text-xl font-bold text-white">Cost Calculator</h3>
+              <p className="text-xs text-neutral-400">Select duration and optional extras to preview estimated cost.</p>
             </div>
           </div>
 
@@ -165,7 +165,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
             
             {/* 1. Base Selection */}
             <div className="space-y-2">
-              <label className="text-xs font-mono text-rose-300 uppercase tracking-wider">Selected Base Offering</label>
+              <label className="text-xs font-mono text-neutral-300 uppercase tracking-wider">Selected Session</label>
               <div className="p-3.5 liquid-input rounded-2xl text-amber-200 font-sans font-bold text-sm">
                 {selectedOffering.title} (${selectedOffering.price})
               </div>
@@ -173,7 +173,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
 
             {/* 2. Duration Multiplier */}
             <div className="space-y-2">
-              <label className="text-xs font-mono text-rose-300 uppercase tracking-wider">Duration Multiplier</label>
+              <label className="text-xs font-mono text-neutral-300 uppercase tracking-wider">Duration Multiplier</label>
               <div className="flex items-center gap-2">
                 {[1, 2, 3].map(mult => (
                   <button
@@ -193,7 +193,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
 
             {/* 3. Add-ons Selection */}
             <div className="space-y-2 col-span-1 md:col-span-3">
-              <label className="text-xs font-mono text-rose-300 uppercase tracking-wider">Optional Protocol Add-Ons</label>
+              <label className="text-xs font-mono text-neutral-300 uppercase tracking-wider">Optional Extras</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {addOnOptions.map(addon => {
                   const isChecked = selectedAddOns.includes(addon.id);
@@ -225,7 +225,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
           {/* Calculator Output & Action */}
           <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-mono text-neutral-400 uppercase">Estimated Total Tribute Requirement:</div>
+              <div className="text-xs font-mono text-neutral-400 uppercase">Estimated Total:</div>
               <div className="text-3xl font-mono font-bold text-amber-300">${totalTribute} USD</div>
             </div>
 
@@ -233,7 +233,7 @@ export const SessionMenu: React.FC<SessionMenuProps> = ({ onSelectOfferingForBoo
               onClick={() => onSelectOfferingForBooking(selectedOffering, totalTribute, selectedAddOns)}
               className="w-full sm:w-auto btn-liquid-gold px-8 py-3.5 text-neutral-950 font-mono text-xs uppercase tracking-widest font-bold rounded-full shadow-xl flex items-center justify-center gap-2 animate-shimmer-sheen overflow-hidden"
             >
-              <span>Submit Inquiry With Estimate</span>
+              <span>Book With Estimate</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

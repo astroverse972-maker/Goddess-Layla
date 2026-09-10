@@ -34,22 +34,22 @@ export const TheVault: React.FC = () => {
         
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-rose-200">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-neutral-200">
             <Lock className="w-3.5 h-3.5 text-amber-300" />
-            <span>Exclusive Archives</span>
+            <span>Audio & Photo Previews</span>
           </div>
           <h2 className="font-sans text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
-            THE VAULT & VOICE TEASERS
+            AUDIO & PHOTO VAULT
           </h2>
           <p className="text-neutral-400 text-sm max-w-xl mx-auto font-normal">
-            Preview bespoke audio notes, visual teasers, and high-fashion editorial archives from Maitresse Aria's personal collection.
+            Listen to sample audio notes and browse high quality photo galleries.
           </p>
         </div>
 
         {/* Audio Teasers Player Grid */}
         <div className="space-y-4">
-          <h3 className="font-sans font-bold text-xl text-white border-l-2 border-rose-400 pl-3">
-            Bespoke Audio Voice Teasers
+          <h3 className="font-sans font-bold text-xl text-white border-l-2 border-amber-400 pl-3">
+            Audio Voice Samples
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

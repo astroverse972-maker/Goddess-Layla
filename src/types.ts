@@ -24,7 +24,7 @@ export interface AudioTeaser {
   id: string;
   title: string;
   duration: string;
-  category: 'Humiliation' | 'Whisper & Hypnosis' | 'Protocol Instruction' | 'Task Assignment';
+  category: string;
   synthFrequency: number;
   description: string;
 }
@@ -32,7 +32,7 @@ export interface AudioTeaser {
 export interface TributeItem {
   id: string;
   name: string;
-  category: 'Wishlist' | 'Direct Tribute' | 'Gift Card' | 'Crypto';
+  category: string;
   price: number;
   linkText: string;
   description: string;
@@ -65,4 +65,23 @@ export interface BookingFormState {
   addOns: string[];
   protocolAccepted: boolean;
   customNotes: string;
+}
+
+export interface PromoBannerClip {
+  id: string;
+  title: string;
+  google_drive_link?: string;
+  video_url: string;
+  thumbnail_url?: string;
+  text_overlay?: string;
+  announcement_badge?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface PromoBannerConfig {
+  global_text_overlay: string;
+  rotation_interval_sec: number;
+  clips: PromoBannerClip[];
 }

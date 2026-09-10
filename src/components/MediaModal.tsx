@@ -25,7 +25,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
 
   const throneUrl = siteSettings.throne_link || paymentSettings.throne || 'https://throne.com';
   const tipfunderUrl = siteSettings.tipfunder_link || paymentSettings.tipfunder;
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
 
   const handleVerifyOrSubmitRef = async () => {
     if (!paymentRefInput.trim() || !item) return;
@@ -34,14 +34,14 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
 
     const ref = paymentRefInput.trim();
 
-    // 1. Try checking if it's an approved VIP token / passcode
+    // 1. Try checking if it's an approved passcode or token
     try {
       const verifyRes = await fetch('/api/verify-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemId: item.id,
-          paymentMethod: 'Throne/TipFunder/VIP',
+          paymentMethod: 'Throne/TipFunder/Direct',
           transactionRef: ref
         })
       });
@@ -50,7 +50,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
       if (verifyRes.ok && verifyData.verified) {
         setUnlocked(true);
         setVerifySuccess(true);
-        setVerifyMessage('Payment verified. Full Google Drive archive access granted.');
+        setVerifyMessage('Payment confirmed. Full video access unlocked.');
         if (verifyData.accessToken) {
           localStorage.setItem(`unlocked_media_${item.id}`, verifyData.accessToken);
         }
@@ -65,7 +65,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
       }
     } catch (e) {}
 
-    // 2. Otherwise submit as payment reference request for Queen Milana to authorize in her terminal
+    // 2. Otherwise submit as payment reference request for Goddess Luzia to authorize in her terminal
     try {
       const subRes = await fetch('/api/payment-requests/submit', {
         method: 'POST',
@@ -82,7 +82,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
       const subData = await subRes.json();
       if (subRes.ok && subData.success) {
         setVerifySuccess(true);
-        setVerifyMessage('Transaction reference submitted to Queen Milana for authorization.');
+        setVerifyMessage('Transaction reference submitted to Goddess Luzia for authorization.');
       } else {
         setVerifySuccess(false);
         setVerifyMessage(subData.error || 'Submission failed. Please check your reference.');
@@ -142,10 +142,10 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
   if (!isOpen || !item) return null;
 
   // Clean, high-status sanitized title and description
-  const title = cleanDisplayTitle(item.titleEn || item.title, 'Exclusive Masterclass Archive');
+  const title = cleanDisplayTitle(item.titleEn || item.title, 'Video Archive');
   const description = cleanDisplayDescription(
     item.descriptionEn || item.description,
-    'Exclusive encrypted masterclass video archive for authorized devotees.'
+    'High quality video archive available upon purchase.'
   );
 
   const isDrivePreview = isUrlOrDriveLink(item.previewUrl);
@@ -178,8 +178,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase font-sans flex items-center gap-2">
-            <span>{creatorName} — {unlocked ? 'Full Archive Authorized' : 'Preview Mode'}</span>
-            {unlocked && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-black border border-gray-300 text-[10px] font-bold">AUTHORIZED</span>}
+            <span>{creatorName} — {unlocked ? 'Full Video Unlocked' : 'Preview Mode'}</span>
+            {unlocked && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-black border border-gray-300 text-[10px] font-bold">UNLOCKED</span>}
           </span>
           
           <button
@@ -245,13 +245,13 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
                 </div>
                 <div className="space-y-1 max-w-md">
                   <span className="text-[11px] font-mono tracking-widest text-white/70 uppercase">
-                    {unlocked ? 'ARCHIVE UNLOCKED' : 'ENCRYPTED MASTERCLASS ASSET'}
+                    {unlocked ? 'VIDEO UNLOCKED' : 'VIDEO PREVIEW'}
                   </span>
                   <h4 className="text-lg font-bold text-white tracking-tight">{title}</h4>
                   <p className="text-xs text-neutral-300 font-normal">
                     {unlocked 
-                      ? 'Payment verified. Click below to open and stream your complete Google Drive archive.' 
-                      : 'Full high-definition Google Drive delivery is unlocked upon payment confirmation.'}
+                      ? 'Payment confirmed. Click below to stream or download your video.' 
+                      : 'Full video access is unlocked upon payment confirmation.'}
                   </p>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              {(item.tags || ['exclusive', '4k', 'queenmilana']).map((tag) => (
+              {(item.tags || ['exclusive', '4k', 'goddessluzia']).map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1 rounded-full bg-gray-100 text-black text-xs font-semibold border border-gray-200/80"
@@ -285,7 +285,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
           <div className="w-full md:w-80 shrink-0 bg-gray-50/90 border border-gray-200/80 rounded-2xl p-5 flex flex-col items-center sm:items-end justify-center gap-3 text-center sm:text-right">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 block">
-                FULL ARCHIVE
+                FULL VIDEO
               </span>
               <span className="text-2xl sm:text-3xl font-extrabold text-black">
                 {item.price.toFixed(2)} €

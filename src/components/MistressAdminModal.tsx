@@ -17,28 +17,24 @@ import {
   CheckCheck, 
   Sliders, 
   DollarSign, 
-  Radio, 
   Info,
   LogOut,
   Image as ImageIcon,
-  Key
+  Key,
+  Layers,
+  Eye,
+  EyeOff,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { CollectionItem } from '../data/collectionData';
-import { OnboardingTutorial } from './OnboardingTutorial';
+import { PromoBannerClip } from '../types';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { cleanDisplayTitle, cleanDisplayDescription, isUrlOrDriveLink } from '../utils/sanitizeMedia';
 
 interface MistressAdminModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentLiveState: {
-    isLive: boolean;
-    title: string;
-    description: string;
-    price: string;
-    streamUrl: string;
-  };
-  onUpdateLiveState: (newState: any) => void;
   onUploadMediaSuccess: () => void;
   publishedVideos: CollectionItem[];
   onDeleteVideo: (videoId: string) => void;
@@ -62,8 +58,6 @@ interface PaymentRequestItem {
 export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   isOpen,
   onClose,
-  currentLiveState,
-  onUpdateLiveState,
   onUploadMediaSuccess,
   publishedVideos,
   onDeleteVideo,
@@ -77,14 +71,14 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem('queen_admin_auth') === 'true';
   });
-  const [username, setUsername] = useState('QueenMilana');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isConfigured, setIsConfigured] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Terminal Tab
-  const [activeTab, setActiveTab] = useState<'queue' | 'upload_video' | 'assets' | 'settings' | 'live'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'upload_video' | 'assets' | 'promo_banner' | 'settings'>('queue');
 
   // Check auth status on open
   useEffect(() => {
@@ -106,10 +100,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         .catch(() => {});
     }
   }, [isOpen]);
-
-  // Onboarding Tutorial State
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [checkedOnboarding, setCheckedOnboarding] = useState(false);
 
   // Queue Tutorial Overlay
   const [showQueueTutorial, setShowQueueTutorial] = useState(() => {
@@ -142,7 +132,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [videoTitle, setVideoTitle] = useState('');
   const [videoPrice, setVideoPrice] = useState('35.00');
   const [videoDuration, setVideoDuration] = useState('18:45');
-  const [videoTags, setVideoTags] = useState('exclusive, 4k, queenmilana');
+  const [videoTags, setVideoTags] = useState('exclusive, 4k, goddessluzia');
   const [videoDescription, setVideoDescription] = useState('Exclusive encrypted video archive. Delivered immediately upon authorized transaction.');
   const [driveUrl, setDriveUrl] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
@@ -156,7 +146,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [tipfunderInput, setTipfunderInput] = useState(siteSettings.tipfunder_link || '');
   const [telegramInput, setTelegramInput] = useState(siteSettings.telegram_link || '');
   const [xInput, setXInput] = useState(siteSettings.twitter_link || '');
-  const [nameInput, setNameInput] = useState(siteSettings.creator_name || 'Queen Milana');
+  const [nameInput, setNameInput] = useState(siteSettings.creator_name || 'Goddess Luzia');
   const [bioInput, setBioInput] = useState(siteSettings.about_text || '');
   const [avatarInput, setAvatarInput] = useState(siteSettings.avatar_url || '');
   const [isUploadingSettingsPhoto, setIsUploadingSettingsPhoto] = useState(false);
@@ -175,21 +165,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [settingsGalleryProgress, setSettingsGalleryProgress] = useState('');
   const settingsGalleryFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Live Stream Control State
-  const [isLive, setIsLive] = useState(currentLiveState.isLive);
-  const [liveTitle, setLiveTitle] = useState(currentLiveState.title);
-  const [liveDesc, setLiveDesc] = useState(currentLiveState.description);
-  const [livePrice, setLivePrice] = useState(currentLiveState.price);
-  const [liveStreamUrl, setLiveStreamUrl] = useState(currentLiveState.streamUrl);
-  const [liveSavedMsg, setLiveSavedMsg] = useState<string | null>(null);
-
   // Sync settings when siteSettings update
   useEffect(() => {
     setThroneInput(siteSettings.throne_link || '');
     setTipfunderInput(siteSettings.tipfunder_link || '');
     setTelegramInput(siteSettings.telegram_link || '');
     setXInput(siteSettings.twitter_link || '');
-    setNameInput(siteSettings.creator_name || 'Queen Milana');
+    setNameInput(siteSettings.creator_name || 'Goddess Luzia');
     setBioInput(siteSettings.about_text || '');
     setAvatarInput(siteSettings.avatar_url || '');
     if (Array.isArray(siteSettings.about_photos)) {
@@ -197,22 +179,175 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   }, [siteSettings]);
 
-  // Check Onboarding status on load
-  useEffect(() => {
-    if (isAuthenticated && !checkedOnboarding) {
-      fetch('/api/admin/onboarding-status')
-        .then(res => res.json())
-        .then(data => {
-          setCheckedOnboarding(true);
-          if (data && !data.completed) {
-            setShowOnboarding(true);
-          }
-        })
-        .catch(() => {
-          setCheckedOnboarding(true);
-        });
+  // ============================================================
+  // PROMOTIONAL ROTATING BANNER SHOWCASE STATE & HANDLERS
+  // ============================================================
+  const [promoClips, setPromoClips] = useState<PromoBannerClip[]>([]);
+  const [globalPromoOverlay, setGlobalPromoOverlay] = useState<string>('Special Offer • Contact for custom video inquiries');
+  const [promoRotationSec, setPromoRotationSec] = useState<number>(6);
+  const [isLoadingPromo, setIsLoadingPromo] = useState<boolean>(false);
+  const [isSavingPromo, setIsSavingPromo] = useState<boolean>(false);
+  const [promoMsg, setPromoMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // New clip form fields
+  const [newClipTitle, setNewClipTitle] = useState<string>('');
+  const [newClipDriveLink, setNewClipDriveLink] = useState<string>('');
+  const [newClipVideoUrl, setNewClipVideoUrl] = useState<string>('');
+  const [newClipThumbnail, setNewClipThumbnail] = useState<string>('');
+  const [newClipTextOverlay, setNewClipTextOverlay] = useState<string>('');
+  const [newClipBadge, setNewClipBadge] = useState<string>('Featured');
+  const [newClipIsActive, setNewClipIsActive] = useState<boolean>(true);
+  const [isAddingClip, setIsAddingClip] = useState<boolean>(false);
+
+  const fetchPromoSettings = async () => {
+    setIsLoadingPromo(true);
+    try {
+      const res = await fetch('/api/promo-banner');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.clips)) {
+          setPromoClips(data.clips);
+        }
+        if (typeof data.global_text_overlay === 'string') {
+          setGlobalPromoOverlay(data.global_text_overlay);
+        }
+        if (typeof data.rotation_interval_sec === 'number' && data.rotation_interval_sec >= 2) {
+          setPromoRotationSec(data.rotation_interval_sec);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch promo banner settings:", e);
+    } finally {
+      setIsLoadingPromo(false);
     }
-  }, [isAuthenticated, checkedOnboarding]);
+  };
+
+  const handleSaveGlobalPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPromo(true);
+    setPromoMsg(null);
+    try {
+      const res = await fetch('/api/admin/promo-banner/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          global_text_overlay: globalPromoOverlay,
+          rotation_interval_sec: promoRotationSec,
+          clips: promoClips
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromoMsg({ type: 'success', text: 'Instellingen voor promotiebanner succesvol opgeslagen!' });
+      } else {
+        setPromoMsg({ type: 'error', text: data.error || 'Opslaan mislukt' });
+      }
+    } catch (err: any) {
+      setPromoMsg({ type: 'error', text: err.message || 'Fout bij opslaan' });
+    } finally {
+      setIsSavingPromo(false);
+    }
+  };
+
+  const handleAddClip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClipDriveLink.trim() && !newClipVideoUrl.trim()) {
+      setPromoMsg({ type: 'error', text: 'Voer een geldige Google Drive link of video URL in.' });
+      return;
+    }
+    setIsAddingClip(true);
+    setPromoMsg(null);
+    try {
+      const res = await fetch('/api/admin/promo-banner/clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newClipTitle.trim() || 'Promo Teaser Clip',
+          google_drive_link: newClipDriveLink.trim(),
+          video_url: newClipVideoUrl.trim() || newClipDriveLink.trim(),
+          thumbnail_url: newClipThumbnail.trim(),
+          text_overlay: newClipTextOverlay.trim(),
+          announcement_badge: newClipBadge.trim() || 'Featured',
+          display_order: promoClips.length + 1,
+          is_active: newClipIsActive
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromoClips(data.clips);
+        setNewClipTitle('');
+        setNewClipDriveLink('');
+        setNewClipVideoUrl('');
+        setNewClipThumbnail('');
+        setNewClipTextOverlay('');
+        setNewClipBadge('Featured');
+        setPromoMsg({ type: 'success', text: 'Nieuwe videoclip succesvol toegevoegd aan de roterende banner!' });
+      } else {
+        setPromoMsg({ type: 'error', text: data.error || 'Toevoegen mislukt' });
+      }
+    } catch (err: any) {
+      setPromoMsg({ type: 'error', text: err.message || 'Fout bij toevoegen' });
+    } finally {
+      setIsAddingClip(false);
+    }
+  };
+
+  const handleToggleClipActive = async (clip: PromoBannerClip) => {
+    const updatedActive = !clip.is_active;
+    try {
+      const res = await fetch(`/api/admin/promo-banner/clip/${clip.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: updatedActive })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromoClips(data.clips);
+      }
+    } catch (e) {
+      console.warn("Toggle clip active error:", e);
+    }
+  };
+
+  const handleDeleteClip = async (id: string) => {
+    if (!window.confirm('Weet u zeker dat u deze videoclip wilt verwijderen uit de banner?')) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/promo-banner/clip/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPromoClips(data.clips);
+        setPromoMsg({ type: 'success', text: 'Clip succesvol verwijderd.' });
+      }
+    } catch (e) {
+      console.warn("Delete clip error:", e);
+    }
+  };
+
+  const handleMoveClip = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= promoClips.length) return;
+
+    const updated = [...promoClips];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    const reordered = updated.map((c, i) => ({ ...c, display_order: i + 1 }));
+    setPromoClips(reordered);
+
+    try {
+      await fetch('/api/admin/promo-banner/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clips: reordered })
+      });
+    } catch (e) {
+      console.warn("Reorder clips error:", e);
+    }
+  };
 
   // Fetch Verification Queue
   const fetchQueue = async () => {
@@ -248,6 +383,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   useEffect(() => {
     if (isAuthenticated) {
       fetchQueue();
+      fetchPromoSettings();
       const interval = setInterval(fetchQueue, 6000);
       return () => clearInterval(interval);
     }
@@ -405,17 +541,17 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
     setIsUploading(true);
     setUploadTerminalLogs([
-      lang === 'nl' ? "SEC_AUTH: Initialiseren van Centurion netwerk..." : "SEC_AUTH: Initializing Centurion network...",
-      lang === 'nl' ? "TARGET_NODE: drive.google.com payload verificatie..." : "TARGET_NODE: drive.google.com payload verification...",
-      lang === 'nl' ? "CRYPTO_HASH: AES-256 asset token toewijzing..." : "CRYPTO_HASH: AES-256 asset token allocation..."
+      lang === 'nl' ? "Systeem: Upload initialiseren..." : "System: Initializing upload...",
+      lang === 'nl' ? "drive.google.com link controleren..." : "Verifying drive.google.com link...",
+      lang === 'nl' ? "Videogegevens opslaan..." : "Saving video details..."
     ]);
 
-    const cleanTitle = cleanDisplayTitle(videoTitle.trim(), lang === 'nl' ? 'VIP Masterclass Protocol 02' : 'VIP Masterclass Protocol 02');
+    const cleanTitle = cleanDisplayTitle(videoTitle.trim(), lang === 'nl' ? 'Nieuwe Video Archief' : 'New Video Archive');
     const cleanDesc = cleanDisplayDescription(
       videoDescription.trim(),
       lang === 'nl'
-        ? 'Exclusief versleuteld masterclass video archief voor geautoriseerde volgelingen.'
-        : 'Exclusive encrypted masterclass video archive for authorized devotees.'
+        ? 'Videobestand beschikbaar na betaling via Throne of TipFunder.'
+        : 'Video archive available upon confirmed payment via Throne or TipFunder.'
     );
 
     try {
@@ -627,51 +763,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
     }
   };
 
-  // Save Live Stream State
-  const handleSaveLiveState = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated = {
-      isLive,
-      title: liveTitle,
-      description: liveDesc,
-      price: livePrice,
-      streamUrl: liveStreamUrl
-    };
-    onUpdateLiveState(updated);
-    try {
-      await fetch('/api/live-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-      setLiveSavedMsg(lang === 'nl' ? "Live stream configuratie direct geactiveerd." : "Live stream state updated.");
-      setTimeout(() => setLiveSavedMsg(null), 3000);
-    } catch (e) {}
-  };
-
   if (!isOpen) return null;
-
-  // Fullscreen Onboarding
-  if (showOnboarding) {
-    return (
-      <OnboardingTutorial
-        initialPaymentSettings={{
-          throne: siteSettings.throne_link,
-          tipfunder: siteSettings.tipfunder_link,
-          telegram: siteSettings.telegram_link,
-          x: siteSettings.twitter_link
-        }}
-        initialProfile={{
-          name: siteSettings.creator_name,
-          bio: siteSettings.about_text,
-          avatar: siteSettings.avatar_url,
-          gallery: siteSettings.about_photos
-        }}
-        onComplete={() => setShowOnboarding(false)}
-        onSkip={() => setShowOnboarding(false)}
-      />
-    );
-  }
 
   const pendingRequests = requests.filter(r => r.status === 'pending');
 
@@ -691,12 +783,12 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         <div id="admin-vault-header" className="px-3 sm:px-6 py-3 sm:py-4 bg-white/[0.03] backdrop-blur-md border-b border-white/10 flex items-center justify-between shrink-0 gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
-              QM
+              GL
             </div>
             <div className="truncate">
               <div className="flex items-center gap-1.5 truncate">
                 <span className="text-[11px] sm:text-xs font-mono font-bold tracking-widest text-white uppercase truncate">
-                  CENTURION // QUEEN MILANA
+                  CENTURION // GODDESS LUZIA
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
               </div>
@@ -741,13 +833,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
             <div className="space-y-2">
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-sans">
-                {lang === 'nl' ? 'Centurion Beheertoegang' : 'Centurion Admin Access'}
+                {lang === 'nl' ? 'Beheertoegang' : 'Admin Access'}
               </h2>
               <div className="p-3.5 sm:p-4 rounded-xl bg-white/[0.04] border border-white/10 text-left space-y-1.5">
                 <p className="text-xs text-neutral-200 font-sans leading-relaxed">
                   {lang === 'nl'
-                    ? 'Tot Uw dienst, Koningin Milana. Log in om directe autorisaties te verlenen, videoprijzen aan te passen en uitbetalingskanalen te beheren.'
-                    : 'At your service, Queen Milana. Log in to command all video archives, devotee verification queues, and payout configurations.'}
+                    ? 'Log in om video\'s te beheren, betalingen te controleren en website-instellingen aan te passen.'
+                    : 'Log in to manage videos, check payments, and update site settings.'}
                 </p>
               </div>
             </div>
@@ -861,7 +953,28 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   }`}
                 >
                   <Film className="w-4 h-4" />
-                  <span>{lang === 'nl' ? `Activa (${publishedVideos.length})` : `Vault Assets (${publishedVideos.length})`}</span>
+                  <span>{lang === 'nl' ? `Video's (${publishedVideos.length})` : `Videos (${publishedVideos.length})`}</span>
+                </button>
+
+                {/* Rotating Promo Showcase Banner */}
+                <button
+                  id="tab-promo-banner-btn"
+                  onClick={() => setActiveTab('promo_banner')}
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center justify-between cursor-pointer shrink-0 whitespace-nowrap ${
+                    activeTab === 'promo_banner'
+                      ? 'bg-white text-black shadow-sm'
+                      : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    <span>{lang === 'nl' ? 'Promo Banner' : 'Promo Banner'}</span>
+                  </div>
+                  {promoClips.filter(c => c.is_active !== false).length > 0 && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'promo_banner' ? 'bg-black text-white' : 'bg-white text-black'}`}>
+                      {promoClips.filter(c => c.is_active !== false).length}
+                    </span>
+                  )}
                 </button>
 
                 {/* Systeemvoorkeuren */}
@@ -878,36 +991,13 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   <span>{lang === 'nl' ? 'Instellingen' : 'Settings'}</span>
                 </button>
 
-                {/* Live Stream VIP */}
-                <button
-                  id="tab-live-btn"
-                  onClick={() => setActiveTab('live')}
-                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
-                    activeTab === 'live'
-                      ? 'bg-white text-black shadow-sm'
-                      : 'hover:bg-white/[0.05] text-neutral-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Radio className="w-4 h-4" />
-                  <span>{lang === 'nl' ? 'Live Stream' : 'Live Stream'}</span>
-                </button>
-
               </div>
 
               <div className="hidden md:block pt-4 border-t border-white/10 space-y-2">
                 <button
-                  id="admin-restart-onboarding-btn"
-                  onClick={() => setShowOnboarding(true)}
-                  className="w-full min-h-[40px] py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-neutral-300 hover:text-white text-xs font-mono flex items-center justify-center gap-2 border border-white/10 transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
-                  <span>{lang === 'nl' ? 'Herstart Onboarding' : 'Replay Onboarding'}</span>
-                </button>
-
-                <button
                   id="admin-logout-btn"
                   onClick={handleLogout}
-                  className="w-full min-h-[40px] py-2 rounded-xl bg-white/[0.04] hover:bg-red-500/20 text-neutral-400 hover:text-red-300 text-xs font-mono flex items-center justify-center gap-2 border border-white/10 hover:border-red-500/30 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 rounded-xl bg-white/[0.04] hover:bg-red-500/20 text-neutral-400 hover:red-300 text-xs font-mono flex items-center justify-center gap-2 border border-white/10 hover:border-red-500/30 transition-all cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>{lang === 'nl' ? 'Uitloggen' : 'Log Out'}</span>
@@ -928,7 +1018,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs font-mono text-white font-bold uppercase">
                           <Info className="w-4 h-4 text-white" />
-                          <span>{lang === 'nl' ? 'BEVEILIGD AUTORISATIE PROTOCOL' : 'SECURE AUTHORIZATION PROTOCOL'}</span>
+                          <span>{lang === 'nl' ? 'BETALING VERIFIËREN' : 'PAYMENT VERIFICATION'}</span>
                         </div>
                         <button
                           onClick={() => {
@@ -943,8 +1033,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
 
                       <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
                         {lang === 'nl'
-                          ? 'Controleer eerst uw inkomende Throne/TipFunder transacties. Zodra de betaling is geverifieerd, klikt u op ‘Autoriseer’ om het Google Drive archief direct vrij te geven.'
-                          : 'Verify incoming devotee payments on Throne or TipFunder. Once confirmed, click ‘Authorize’ to deliver the encrypted Google Drive link.'}
+                          ? 'Controleer eerst uw inkomende Throne/TipFunder transacties. Zodra de betaling is geverifieerd, klikt u op ‘Goedkeuren’ om de Google Drive link direct vrij te geven.'
+                          : 'Check incoming payments on Throne or TipFunder. Once confirmed, click ‘Approve’ to share the Google Drive link.'}
                       </p>
 
                       <div className="flex justify-end pt-1">
@@ -995,8 +1085,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       </div>
                       <p className="text-[11px] sm:text-xs text-neutral-400 font-mono max-w-md mx-auto leading-relaxed">
                         {lang === 'nl' 
-                          ? 'Uw verificatiewachtrij is momenteel leeg. Zodra volgelingen bewijs van hulde of betaling via Throne of TipFunder indienen, verschijnen hun echte verzoeken hier voor autorisatie.' 
-                          : 'Your verification queue is currently empty. When devotees submit genuine proof of payment on Throne or TipFunder, their real requests appear here.'}
+                          ? 'Uw verificatiewachtrij is momenteel leeg. Zodra kopers bewijs van betaling via Throne of TipFunder indienen, verschijnen hun verzoeken hier ter controle.' 
+                          : 'Your verification queue is currently empty. When buyers submit payment references from Throne or TipFunder, their requests appear here for approval.'}
                       </p>
                     </div>
                   ) : (
@@ -1098,7 +1188,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                   <form onSubmit={handleUploadVideo} className="space-y-3.5">
                     <div className="space-y-1">
                       <label className="text-[11px] font-mono font-bold uppercase text-white">
-                        {lang === 'nl' ? 'TITEL VAN HET ARCHIEF (VERPLICHT)' : 'ARCHIVE TITLE (REQUIRED)'}
+                        {lang === 'nl' ? 'TITEL VAN DE VIDEO (VERPLICHT)' : 'VIDEO TITLE (REQUIRED)'}
                       </label>
                       <input
                         id="video-title-input"
@@ -1108,7 +1198,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           const val = e.target.value;
                           if (isUrlOrDriveLink(val)) {
                             if (!driveUrl) setDriveUrl(val.trim());
-                            setVideoTitle(lang === 'nl' ? 'VIP Masterclass Protocol 02' : 'VIP Masterclass Protocol 02');
+                            setVideoTitle(lang === 'nl' ? 'Nieuwe Video Archief 01' : 'New Video Archive 01');
                             setUploadError(
                               lang === 'nl'
                                 ? 'Google Drive link automatisch verplaatst naar het Google Drive Link veld hieronder.'
@@ -1118,7 +1208,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                             setVideoTitle(val);
                           }
                         }}
-                        placeholder={lang === 'nl' ? 'bijv. VIP Masterclass Sessie No. 02' : 'e.g. Masterclass Protocol Session 02'}
+                        placeholder={lang === 'nl' ? 'bijv. Video Sessie No. 02' : 'e.g. Video Session 02'}
                         className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none"
                       />
                     </div>
@@ -1232,16 +1322,16 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 3: VAULT ASSETS OVERVIEW */}
+              {/* TAB 3: ASSETS OVERVIEW */}
               {activeTab === 'assets' && (
                 <div id="assets-tab-content" className="space-y-4 sm:space-y-6 animate-fade-in">
                   <div className="flex items-center justify-between border-b border-white/10 pb-3">
                     <div>
                       <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
-                        {lang === 'nl' ? 'Gepubliceerde Activa' : 'Published Vault Assets'}
+                        {lang === 'nl' ? 'Gepubliceerde Video\'s' : 'Published Videos'}
                       </h3>
                       <p className="text-xs text-neutral-400 font-mono">
-                        {publishedVideos.length} {lang === 'nl' ? 'actieve video\'s in VIP archief' : 'active video archives in vault'}
+                        {publishedVideos.length} {lang === 'nl' ? 'actieve video\'s op de site' : 'active videos on the site'}
                       </p>
                     </div>
                   </div>
@@ -1250,7 +1340,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                     <div className="py-12 text-center space-y-2 bg-white/[0.02] rounded-2xl border border-white/10 p-4">
                       <Film className="w-8 h-8 text-neutral-500 mx-auto" />
                       <p className="text-xs text-neutral-300 font-mono">
-                        {lang === 'nl' ? 'Nog geen video-activa gepubliceerd.' : 'No video assets published yet.'}
+                        {lang === 'nl' ? 'Nog geen video\'s gepubliceerd.' : 'No videos published yet.'}
                       </p>
                     </div>
                   ) : (
@@ -1286,7 +1376,349 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: SYSTEM SETTINGS (INCL REAL FILE UPLOAD TO profile_assets & GALLERY MANAGER) */}
+              {/* TAB 4: ROTATING PROMO SHOWCASE BANNER */}
+              {activeTab === 'promo_banner' && (
+                <div id="promo-banner-tab-content" className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+                  <div className="space-y-1 border-b border-white/10 pb-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans flex items-center gap-2">
+                        <Layers className="w-5 h-5 text-white" />
+                        <span>Roterende Promo Showcase & Banners</span>
+                      </h3>
+                      <button
+                        onClick={fetchPromoSettings}
+                        disabled={isLoadingPromo}
+                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPromo ? 'animate-spin' : ''}`} />
+                        <span>Vernieuwen</span>
+                      </button>
+                    </div>
+                    <p className="text-xs text-neutral-400 font-mono">
+                      Apple-stijl automatische videocarrousel op de homepage. Voeg korte teaser clips toe via Google Drive links en beheer aankondigingen of acties.
+                    </p>
+                  </div>
+
+                  {/* Feedback Toast */}
+                  {promoMsg && (
+                    <div
+                      className={`p-3.5 rounded-xl border flex items-center justify-between gap-2 text-xs font-mono ${
+                        promoMsg.type === 'success'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : 'bg-red-500/10 border-red-500/30 text-red-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {promoMsg.type === 'success' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        )}
+                        <span>{promoMsg.text}</span>
+                      </div>
+                      <button onClick={() => setPromoMsg(null)} className="text-white/60 hover:text-white">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* SECTION 1: GLOBAL ANNOUNCEMENT & SPEED */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                    <div className="flex items-center gap-2 text-white font-mono font-bold text-xs uppercase tracking-wide">
+                      <Sparkles className="w-4 h-4 text-white" />
+                      <span>Algemene Aankondiging & Carrousel Timing</span>
+                    </div>
+
+                    <form onSubmit={handleSaveGlobalPromo} className="space-y-3.5">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono uppercase text-neutral-300">
+                          Algemene Tekstoverlay / Actie (getoond indien clip geen eigen tekst heeft)
+                        </label>
+                        <input
+                          type="text"
+                          value={globalPromoOverlay}
+                          onChange={(e) => setGlobalPromoOverlay(e.target.value)}
+                          placeholder="bijv. 20% korting deze week • Code: LUZIA20"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-mono uppercase text-neutral-300">
+                            Rotatie Interval (Seconden per video)
+                          </label>
+                          <select
+                            value={promoRotationSec}
+                            onChange={(e) => setPromoRotationSec(Number(e.target.value))}
+                            className="w-full min-h-[44px] bg-neutral-900 border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none font-mono"
+                          >
+                            <option value={4}>4 seconden (Snel)</option>
+                            <option value={6}>6 seconden (Aanbevolen)</option>
+                            <option value={8}>8 seconden (Rustig)</option>
+                            <option value={10}>10 seconden</option>
+                            <option value={15}>15 seconden</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-end">
+                          <button
+                            type="submit"
+                            disabled={isSavingPromo}
+                            className="w-full min-h-[44px] bg-white text-black hover:bg-neutral-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                          >
+                            {isSavingPromo ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Opslaan...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                <span>Voorkeuren Opslaan</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* SECTION 2: ADD NEW PROMO CLIP */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                    <div className="flex items-center gap-2 text-white font-mono font-bold text-xs uppercase tracking-wide">
+                      <Plus className="w-4 h-4 text-white" />
+                      <span>Nieuwe Korte Videoclip Toevoegen</span>
+                    </div>
+
+                    <form onSubmit={handleAddClip} className="space-y-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-mono uppercase text-white">
+                            Titel van de Promo Clip
+                          </label>
+                          <input
+                            type="text"
+                            value={newClipTitle}
+                            onChange={(e) => setNewClipTitle(e.target.value)}
+                            placeholder="bijv. Video Teaser 01"
+                            className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-mono uppercase text-white">
+                            Badge Label
+                          </label>
+                          <input
+                            type="text"
+                            value={newClipBadge}
+                            onChange={(e) => setNewClipBadge(e.target.value)}
+                            placeholder="bijv. Featured, Nieuwe Video, Speciale Actie"
+                            className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono font-bold uppercase text-white flex items-center justify-between">
+                          <span>Google Drive Link (Verplicht of Video URL)</span>
+                          <span className="text-[9px] text-neutral-400 font-mono">DRIVE.GOOGLE.COM</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={newClipDriveLink}
+                          onChange={(e) => setNewClipDriveLink(e.target.value)}
+                          placeholder="https://drive.google.com/file/d/.../view"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-mono uppercase text-neutral-300">
+                            Directe Video URL (optioneel, bijv. .mp4)
+                          </label>
+                          <input
+                            type="url"
+                            value={newClipVideoUrl}
+                            onChange={(e) => setNewClipVideoUrl(e.target.value)}
+                            placeholder="https://.../video.mp4"
+                            className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-mono uppercase text-neutral-300">
+                            Thumbnail Poster URL (optioneel)
+                          </label>
+                          <input
+                            type="url"
+                            value={newClipThumbnail}
+                            onChange={(e) => setNewClipThumbnail(e.target.value)}
+                            placeholder="https://images.unsplash.com/..."
+                            className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono uppercase text-neutral-300">
+                          Specifieke Tekstoverlay / Aankondiging voor deze clip (optioneel)
+                        </label>
+                        <input
+                          type="text"
+                          value={newClipTextOverlay}
+                          onChange={(e) => setNewClipTextOverlay(e.target.value)}
+                          placeholder="bijv. 20% korting op dit archief deze week met code LUZIA20"
+                          className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-neutral-300">
+                          <input
+                            type="checkbox"
+                            checked={newClipIsActive}
+                            onChange={(e) => setNewClipIsActive(e.target.checked)}
+                            className="rounded border-white/20 text-white focus:ring-0 cursor-pointer"
+                          />
+                          <span>Direct actief in roterende banner</span>
+                        </label>
+
+                        <button
+                          type="submit"
+                          disabled={isAddingClip}
+                          className="min-h-[44px] px-6 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                        >
+                          {isAddingClip ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Toevoegen...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4" />
+                              <span>Videoclip Toevoegen</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* SECTION 3: CLIPS ORDER & ACTIVE STATUS */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-white font-mono font-bold text-xs uppercase tracking-wide">
+                        <Film className="w-4 h-4 text-white" />
+                        <span>Carrousel Volgorde & Actieve Status ({promoClips.length})</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-neutral-400">
+                        {promoClips.filter(c => c.is_active !== false).length} actief in rotatie
+                      </span>
+                    </div>
+
+                    {promoClips.length === 0 ? (
+                      <div className="py-8 text-center text-neutral-400 font-mono text-xs">
+                        Nog geen aangepaste clips toegevoegd. De banner toont momenteel de standaard clips.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {promoClips.map((clip, index) => {
+                          const isActive = clip.is_active !== false;
+                          return (
+                            <div
+                              key={clip.id || index}
+                              className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono ${
+                                isActive ? 'bg-white/[0.04] border-white/15' : 'bg-black/40 border-white/5 opacity-60'
+                              }`}
+                            >
+                              {/* Left: Position Number + Clip Details */}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
+                                  #{index + 1}
+                                </span>
+
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-white text-xs truncate">
+                                      {clip.title || 'Promo Clip'}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-neutral-200">
+                                      {clip.announcement_badge || 'Featured'}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-[11px] text-neutral-400 truncate max-w-md">
+                                    {clip.text_overlay ? (
+                                      <span className="text-neutral-300">Overlay: "{clip.text_overlay}"</span>
+                                    ) : (
+                                      <span className="text-neutral-500">Overlay: Gebruikt algemene tekst</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Controls (Move Up/Down, Toggle Active, Delete) */}
+                              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                {/* Move Up */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveClip(index, 'up')}
+                                  disabled={index === 0}
+                                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Omhoog verplaatsen"
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+
+                                {/* Move Down */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveClip(index, 'down')}
+                                  disabled={index === promoClips.length - 1}
+                                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 disabled:opacity-30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Omlaag verplaatsen"
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+
+                                {/* Active Toggle */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleClipActive(clip)}
+                                  className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    isActive
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                      : 'bg-white/5 text-neutral-400 border border-white/10'
+                                  }`}
+                                  title={isActive ? 'Klik om te pauzeren' : 'Klik om te activeren'}
+                                >
+                                  {isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                  <span>{isActive ? 'Actief' : 'Pauze'}</span>
+                                </button>
+
+                                {/* Delete Clip */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteClip(clip.id)}
+                                  className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Clip verwijderen"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: SYSTEM SETTINGS (INCL REAL FILE UPLOAD TO profile_assets & GALLERY MANAGER) */}
               {activeTab === 'settings' && (
                 <div id="settings-tab-content" className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
                   <div className="space-y-1">
@@ -1310,7 +1742,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         type="url"
                         value={throneInput}
                         onChange={(e) => setThroneInput(e.target.value)}
-                        placeholder="https://throne.com/queenmilana"
+                        placeholder="https://throne.com/goddessluzia"
                         className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
                       />
                     </div>
@@ -1324,7 +1756,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         type="url"
                         value={tipfunderInput}
                         onChange={(e) => setTipfunderInput(e.target.value)}
-                        placeholder="https://tipfunder.com/queenmilana"
+                        placeholder="https://tipfunder.com/goddessluzia"
                         className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
                       />
                     </div>
@@ -1337,7 +1769,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           type="url"
                           value={telegramInput}
                           onChange={(e) => setTelegramInput(e.target.value)}
-                          placeholder="https://t.me/queenmilana"
+                          placeholder="https://t.me/goddessluzia"
                           className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
@@ -1348,7 +1780,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                           type="url"
                           value={xInput}
                           onChange={(e) => setXInput(e.target.value)}
-                          placeholder="https://x.com/queenmilana"
+                          placeholder="https://x.com/goddessluzia"
                           className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                         />
                       </div>
@@ -1438,8 +1870,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-[11px] text-neutral-400 font-sans">
                             {lang === 'nl' 
-                              ? 'Foto\'s worden direct geüpload naar profile_assets en getoond in de openbare VIP-slideshow.'
-                              : 'Photos upload directly to profile_assets and power the public VIP slideshow.'}
+                              ? 'Foto\'s worden direct geüpload naar profile_assets en getoond in de fotoslideshow.'
+                              : 'Photos upload directly to profile_assets and power the photo slideshow.'}
                           </p>
 
                           <input
@@ -1516,101 +1948,6 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
                     >
                       {lang === 'nl' ? 'Opslaan & Synchroniseren' : 'Save & Sync Settings'}
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {/* TAB 5: LIVE STREAM FEED */}
-              {activeTab === 'live' && (
-                <div id="live-tab-content" className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
-                  <div className="space-y-1">
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white font-sans">
-                      {lang === 'nl' ? 'VIP Live Stream Beheer' : 'VIP Live Stream Control'}
-                    </h3>
-                    <p className="text-xs text-neutral-400 font-mono">
-                      {lang === 'nl' ? 'Schakel uw live stream in of uit en beheer tarieven.' : 'Enable or disable live broadcast status and pricing.'}
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleSaveLiveState} className="space-y-3.5">
-                    <div className="p-3.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between gap-3">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-mono font-bold text-white uppercase">
-                          STREAM STATUS
-                        </span>
-                        <p className="text-[11px] text-neutral-400">
-                          {isLive 
-                            ? (lang === 'nl' ? 'Stream is momenteel LIVE' : 'Stream is currently LIVE')
-                            : (lang === 'nl' ? 'Stream is momenteel OFFLINE' : 'Stream is currently OFFLINE')}
-                        </p>
-                      </div>
-                      <button
-                        id="toggle-live-status-btn"
-                        type="button"
-                        onClick={() => setIsLive(!isLive)}
-                        className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer shrink-0 ${
-                          isLive 
-                            ? 'bg-white text-black shadow-md' 
-                            : 'bg-white/[0.08] text-neutral-400 hover:text-white border border-white/10'
-                        }`}
-                      >
-                        {isLive ? (lang === 'nl' ? '● LIVE' : '● LIVE') : (lang === 'nl' ? '○ OFFLINE' : '○ OFFLINE')}
-                      </button>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono uppercase text-neutral-300">
-                        {lang === 'nl' ? 'STREAM TITEL' : 'STREAM TITLE'}
-                      </label>
-                      <input
-                        id="live-title-input"
-                        type="text"
-                        value={liveTitle}
-                        onChange={(e) => setLiveTitle(e.target.value)}
-                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-sans text-white focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono uppercase text-neutral-300">
-                        {lang === 'nl' ? 'TOEGANGSPRIJS (€)' : 'ACCESS TRIBUTE (€)'}
-                      </label>
-                      <input
-                        id="live-price-input"
-                        type="text"
-                        value={livePrice}
-                        onChange={(e) => setLivePrice(e.target.value)}
-                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono uppercase text-neutral-300">
-                        {lang === 'nl' ? 'STREAM OMSCHRIJVING' : 'STREAM DESCRIPTION'}
-                      </label>
-                      <textarea
-                        id="live-desc-input"
-                        rows={2}
-                        value={liveDesc}
-                        onChange={(e) => setLiveDesc(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/10 focus:border-white rounded-xl p-3 text-xs font-sans text-white focus:outline-none resize-none"
-                      />
-                    </div>
-
-                    {liveSavedMsg && (
-                      <div className="p-3 rounded-xl bg-white/[0.08] border border-white/20 text-white text-xs font-mono flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                        <span>{liveSavedMsg}</span>
-                      </div>
-                    )}
-
-                    <button
-                      id="save-live-submit-btn"
-                      type="submit"
-                      className="w-full min-h-[44px] py-3 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-mono font-bold tracking-wider uppercase shadow-lg transition-all active:scale-95 cursor-pointer"
-                    >
-                      {lang === 'nl' ? 'Opslaan' : 'Save Live Stream Settings'}
                     </button>
                   </form>
                 </div>

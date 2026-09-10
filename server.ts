@@ -94,42 +94,265 @@ app.post("/api/aria-chat", async (req, res) => {
   }
 });
 
-// Live Stream State Engine
-let liveStreamState = {
-  isLive: false, // Default to OFFLINE
-  title: "Exclusive Live Session with Goddess Milana",
-  description: "Exclusive live stream preview. Enter my VIP sanctuary. Reserved for verified devotees.",
-  price: "20.00 €",
-  streamUrl: "",
-  updatedAt: Date.now()
+// ====================================================================
+// ROTATING PROMOTIONAL BANNER (Apple-Style Video Showcase)
+// ====================================================================
+interface PromoClipItem {
+  id: string;
+  title: string;
+  google_drive_link: string;
+  video_url: string;
+  thumbnail_url: string;
+  text_overlay: string;
+  announcement_badge: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+let promoBannerState: {
+  global_text_overlay: string;
+  rotation_interval_sec: number;
+  clips: PromoClipItem[];
+} = {
+  global_text_overlay: "Exclusive previews & custom content by Goddess Luzia",
+  rotation_interval_sec: 6,
+  clips: [
+    {
+      id: "promo-clip-1",
+      title: "Exclusive Video Spotlight",
+      google_drive_link: "",
+      video_url: "https://i.imgur.com/m0CSW44.mp4",
+      thumbnail_url: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=1200&auto=format&fit=crop",
+      text_overlay: "Full 4K Uncut Video Available in Collection",
+      announcement_badge: "New Release",
+      display_order: 1,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "promo-clip-2",
+      title: "Custom Video Requests & Highlights",
+      google_drive_link: "",
+      video_url: "https://i.imgur.com/gK9qN2p.mp4",
+      thumbnail_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200&auto=format&fit=crop",
+      text_overlay: "Special promotion this week with code LUZIA20",
+      announcement_badge: "Featured Teaser",
+      display_order: 2,
+      is_active: true,
+      created_at: new Date().toISOString()
+    }
+  ]
 };
 
-// Endpoint to fetch current live status
-app.get("/api/live-status", async (_req, res) => {
+async function syncPromoBannerToSupabase() {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return;
+  try {
+    // 1. Save to site_settings as json fallback
+    await supabase.from("site_settings").upsert({
+      key: "promo_banner_config",
+      value: {
+        global_text_overlay: promoBannerState.global_text_overlay,
+        rotation_interval_sec: promoBannerState.rotation_interval_sec,
+        clips: promoBannerState.clips
+      },
+      updated_at: new Date().toISOString()
+    });
+
+    // 2. Also attempt saving each clip to promo_banner_clips table if it exists
+    for (const clip of promoBannerState.clips) {
+      try {
+        await supabase.from("promo_banner_clips").upsert({
+          id: clip.id,
+          title: clip.title,
+          google_drive_link: clip.google_drive_link,
+          video_url: clip.video_url,
+          thumbnail_url: clip.thumbnail_url,
+          text_overlay: clip.text_overlay,
+          announcement_badge: clip.announcement_badge,
+          display_order: clip.display_order,
+          is_active: clip.is_active,
+          updated_at: new Date().toISOString()
+        });
+      } catch {
+        // Table might not exist yet if only site_settings is initialized
+      }
+    }
+  } catch (e) {
+    console.warn("Failed saving promo banner to Supabase:", e);
+  }
+}
+
+// GET /api/promo-banner - Fetch active rotating promo clips & configuration
+app.get("/api/promo-banner", async (_req, res) => {
   const supabase = getSupabaseServerClient();
   if (supabase) {
     try {
-      const { data: streamData } = await supabase
+      const { data: dbClips, error: clipsErr } = await supabase
+        .from("promo_banner_clips")
+        .select("*")
+        .order("display_order", { ascending: true });
+
+      const { data: configData } = await supabase
         .from("site_settings")
         .select("value")
-        .eq("key", "live_stream_status")
+        .eq("key", "promo_banner_config")
         .maybeSingle();
 
-      if (streamData && streamData.value) {
-        liveStreamState = { ...liveStreamState, ...streamData.value };
-      } else {
-        const { data: legacyData } = await supabase
-          .from("site_settings")
-          .select("value")
-          .eq("key", "live_status")
-          .maybeSingle();
-        if (legacyData && legacyData.value) {
-          liveStreamState = { ...liveStreamState, ...legacyData.value };
+      if (!clipsErr && Array.isArray(dbClips) && dbClips.length > 0) {
+        promoBannerState.clips = dbClips.map((c: any) => ({
+          id: String(c.id),
+          title: c.title || "",
+          google_drive_link: c.google_drive_link || "",
+          video_url: c.video_url || "",
+          thumbnail_url: c.thumbnail_url || "",
+          text_overlay: c.text_overlay || "",
+          announcement_badge: c.announcement_badge || "Featured",
+          display_order: Number(c.display_order) || 1,
+          is_active: c.is_active !== false,
+          created_at: c.created_at || new Date().toISOString()
+        }));
+      } else if (configData && configData.value && Array.isArray(configData.value.clips)) {
+        promoBannerState.clips = configData.value.clips;
+      }
+
+      if (configData && configData.value) {
+        if (typeof configData.value.global_text_overlay === "string") {
+          promoBannerState.global_text_overlay = configData.value.global_text_overlay;
+        }
+        if (typeof configData.value.rotation_interval_sec === "number") {
+          promoBannerState.rotation_interval_sec = configData.value.rotation_interval_sec;
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Promo banner db sync notice:", e);
+    }
   }
-  res.json(liveStreamState);
+
+  res.json({
+    success: true,
+    global_text_overlay: promoBannerState.global_text_overlay,
+    rotation_interval_sec: promoBannerState.rotation_interval_sec,
+    clips: promoBannerState.clips
+  });
+});
+
+// POST /api/admin/promo-banner/clip - Add a new promotional short clip (via Google Drive link or video URL)
+app.post("/api/admin/promo-banner/clip", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+  try {
+    const { title, google_drive_link, video_url, thumbnail_url, text_overlay, announcement_badge, display_order, is_active } = req.body;
+    const newId = `promo-${Date.now()}`;
+    const cleanDrive = google_drive_link ? String(google_drive_link).trim() : "";
+    const cleanVideo = video_url ? String(video_url).trim() : cleanDrive;
+
+    const newClip: PromoClipItem = {
+      id: newId,
+      title: title ? String(title).trim() : "Promo Teaser Clip",
+      google_drive_link: cleanDrive,
+      video_url: cleanVideo,
+      thumbnail_url: thumbnail_url ? String(thumbnail_url).trim() : "",
+      text_overlay: text_overlay ? String(text_overlay).trim() : "",
+      announcement_badge: announcement_badge ? String(announcement_badge).trim() : "Featured",
+      display_order: typeof display_order === "number" ? display_order : (promoBannerState.clips.length + 1),
+      is_active: is_active !== false,
+      created_at: new Date().toISOString()
+    };
+
+    promoBannerState.clips.push(newClip);
+    await syncPromoBannerToSupabase();
+
+    return res.json({ success: true, clip: newClip, clips: promoBannerState.clips });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/promo-banner/clip/:id - Update clip details (text overlay, announcement, order, active status)
+app.put("/api/admin/promo-banner/clip/:id", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+  try {
+    const { id } = req.params;
+    const idx = promoBannerState.clips.findIndex(c => c.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "Promo clip not found" });
+    }
+
+    const { title, google_drive_link, video_url, thumbnail_url, text_overlay, announcement_badge, display_order, is_active } = req.body;
+    if (title !== undefined) promoBannerState.clips[idx].title = String(title).trim();
+    if (google_drive_link !== undefined) promoBannerState.clips[idx].google_drive_link = String(google_drive_link).trim();
+    if (video_url !== undefined) promoBannerState.clips[idx].video_url = String(video_url).trim();
+    if (thumbnail_url !== undefined) promoBannerState.clips[idx].thumbnail_url = String(thumbnail_url).trim();
+    if (text_overlay !== undefined) promoBannerState.clips[idx].text_overlay = String(text_overlay).trim();
+    if (announcement_badge !== undefined) promoBannerState.clips[idx].announcement_badge = String(announcement_badge).trim();
+    if (display_order !== undefined) promoBannerState.clips[idx].display_order = Number(display_order) || 1;
+    if (is_active !== undefined) promoBannerState.clips[idx].is_active = Boolean(is_active);
+
+    await syncPromoBannerToSupabase();
+    return res.json({ success: true, clip: promoBannerState.clips[idx], clips: promoBannerState.clips });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/promo-banner/clip/:id - Remove clip from rotation
+app.delete("/api/admin/promo-banner/clip/:id", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+  try {
+    const { id } = req.params;
+    promoBannerState.clips = promoBannerState.clips.filter(c => c.id !== id);
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase.from("promo_banner_clips").delete().eq("id", id);
+      } catch (e) {}
+    }
+
+    await syncPromoBannerToSupabase();
+    return res.json({ success: true, clips: promoBannerState.clips });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/promo-banner/config - Update global announcement & rotation interval & clip order
+app.post("/api/admin/promo-banner/config", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+  try {
+    const { global_text_overlay, rotation_interval_sec, clips } = req.body;
+    if (global_text_overlay !== undefined) {
+      promoBannerState.global_text_overlay = String(global_text_overlay).trim();
+    }
+    if (rotation_interval_sec !== undefined) {
+      const sec = Number(rotation_interval_sec);
+      if (sec >= 2 && sec <= 60) {
+        promoBannerState.rotation_interval_sec = sec;
+      }
+    }
+    if (Array.isArray(clips)) {
+      promoBannerState.clips = clips;
+    }
+
+    await syncPromoBannerToSupabase();
+    return res.json({
+      success: true,
+      global_text_overlay: promoBannerState.global_text_overlay,
+      rotation_interval_sec: promoBannerState.rotation_interval_sec,
+      clips: promoBannerState.clips
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // Helper functions for Supabase Admin Credentials
@@ -358,41 +581,6 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-// GET /api/admin/onboarding-status - Check if Goddess Milana has completed first-time setup
-app.get("/api/admin/onboarding-status", async (req, res) => {
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "onboarding_completed")
-        .maybeSingle();
-
-      if (data && data.value) {
-        return res.json({ completed: Boolean(data.value.completed) });
-      }
-    } catch (e) {}
-  }
-  // Default to true if not explicitly false/configured or false on fresh setup
-  return res.json({ completed: false });
-});
-
-// POST /api/admin/onboarding-complete - Mark first-time setup as completed
-app.post("/api/admin/onboarding-complete", async (req, res) => {
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    try {
-      await supabase.from("site_settings").upsert({
-        key: "onboarding_completed",
-        value: { completed: true, completedAt: new Date().toISOString() },
-        updated_at: new Date().toISOString()
-      });
-    } catch (e) {}
-  }
-  return res.json({ success: true, message: "Onboarding completed successfully!" });
-});
-
 // POST /api/admin/upload-profile-image - Upload profile photo directly to Supabase storage (profile_assets)
 app.post("/api/admin/upload-profile-image", async (req, res) => {
   if (!checkIsAdmin(req)) {
@@ -613,8 +801,8 @@ const pendingPaymentRequests: Array<{
 // Helper to normalize and sanitize real payment requests
 function normalizePaymentRequest(item: any) {
   const videoId = item.video_id || item.videoId || item.itemId || "media-asset";
-  const videoTitle = item.video_title || item.videoTitle || item.itemTitle || "Exclusive Video Archive";
-  const fanId = item.fan_identifier || item.fanIdentifier || "Anonymous Devotee";
+  const videoTitle = item.video_title || item.videoTitle || item.itemTitle || "Video Archive";
+  const fanId = item.fan_identifier || item.fanIdentifier || "Supporter";
   const method = item.payment_method || item.paymentMethod || "Throne";
   const ref = item.transaction_ref || item.transactionRef || "Direct";
   const amount = item.amount || "35.00 €";
@@ -868,7 +1056,7 @@ const handleClientPaymentSubmission = async (req: express.Request, res: express.
 
     return res.json({
       success: true,
-      message: "Uw verificatieverzoek is ingediend bij Godin Milana. Zodra zij uw hulde autoriseert, wordt uw toegang vrijgegeven.",
+      message: "Uw verificatieverzoek is ingediend bij Goddess Luzia. Zodra zij uw hulde autoriseert, wordt uw toegang vrijgegeven.",
       request: newRequest
     });
   } catch (err: any) {
@@ -943,51 +1131,6 @@ app.post("/api/admin/change-credentials", async (req, res) => {
   }
 });
 
-// Endpoint for Mistress to update Live Status (Go Live / Set Offline)
-app.post("/api/live-status", async (req, res) => {
-  if (!checkIsAdmin(req)) {
-    return res.status(401).json({ error: "Unauthorized. Admin session required." });
-  }
-  try {
-    const { isLive, title, description, price, streamUrl } = req.body;
-
-    liveStreamState = {
-      isLive: Boolean(isLive),
-      title: title || liveStreamState.title,
-      description: description || liveStreamState.description,
-      price: price || liveStreamState.price,
-      streamUrl: streamUrl || liveStreamState.streamUrl,
-      updatedAt: Date.now()
-    };
-
-    const supabase = getSupabaseServerClient();
-    if (supabase) {
-      try {
-        await supabase.from("site_settings").upsert([
-          {
-            key: "live_stream_status",
-            value: liveStreamState,
-            updated_at: new Date().toISOString()
-          },
-          {
-            key: "live_status",
-            value: liveStreamState,
-            updated_at: new Date().toISOString()
-          }
-        ]);
-      } catch (e) {}
-    }
-
-    return res.json({ 
-      success: true, 
-      liveState: liveStreamState, 
-      message: liveStreamState.isLive ? "Queen Milana is NOW LIVE!" : "Queen Milana is currently offline." 
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
 // Catbox.moe Server Proxy Upload Endpoint
 app.post("/api/upload-catbox", async (req, res) => {
   try {
@@ -1031,16 +1174,16 @@ let centralSiteSettingsState = {
   twitter_link: "",
   telegram_link: "",
   tipfunder_link: "",
-  creator_name: "Queen Milana",
-  about_text: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  creator_name: "Goddess Luzia",
+  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
   avatar_url: "",
   about_photos: [] as string[]
 };
 
 let creatorProfileState = {
-  name: "Queen Milana",
+  name: "Goddess Luzia",
   avatar: "",
-  bio: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
   gallery: [] as string[]
 };
 
@@ -1240,41 +1383,6 @@ app.post("/api/payment-settings", async (req, res) => {
   }
 });
 
-// GET /api/admin/onboarding-status - Check if Goddess Milana has completed her initial setup tutorial
-app.get("/api/admin/onboarding-status", async (req, res) => {
-  const supabase = getSupabaseServerClient();
-  let isComplete = false;
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "onboarding_completed")
-        .maybeSingle();
-
-      if (data && data.value) {
-        isComplete = Boolean(data.value.completed);
-      }
-    } catch (e) {}
-  }
-  res.json({ completed: isComplete });
-});
-
-// POST /api/admin/onboarding-complete - Mark onboarding tutorial as completed in Supabase site_settings
-app.post("/api/admin/onboarding-complete", async (req, res) => {
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    try {
-      await supabase.from("site_settings").upsert({
-        key: "onboarding_completed",
-        value: { completed: true, completed_at: new Date().toISOString() },
-        updated_at: new Date().toISOString()
-      });
-    } catch (e) {}
-  }
-  res.json({ success: true, completed: true });
-});
-
 // POST /api/admin/storage/profile-upload-url - Generate Signed Upload URL for 'profile_images' bucket
 app.post("/api/admin/storage/profile-upload-url", async (req, res) => {
   if (!checkIsAdmin(req)) {
@@ -1399,14 +1507,14 @@ function isUrlOrDriveLinkServer(str: any): boolean {
   );
 }
 
-function cleanServerTitle(title: any, fallback = "Exclusive Masterclass Session"): string {
+function cleanServerTitle(title: any, fallback = "Video Archive"): string {
   if (!title || typeof title !== "string") return fallback;
   const trimmed = title.trim();
   if (isUrlOrDriveLinkServer(trimmed)) return fallback;
   return trimmed || fallback;
 }
 
-function cleanServerDescription(desc: any, fallback = "Exclusive encrypted masterclass video archive for authorized devotees."): string {
+function cleanServerDescription(desc: any, fallback = "High quality video archive available upon purchase."): string {
   if (!desc || typeof desc !== "string") return fallback;
   const trimmed = desc.trim();
   if (isUrlOrDriveLinkServer(trimmed)) return fallback;
@@ -1448,8 +1556,8 @@ app.get("/api/custom-media", async (req, res) => {
             if (!copy.googleDriveLink) {
               copy.googleDriveLink = copy.title;
             }
-            copy.title = "Exclusive Masterclass Session";
-            copy.titleEn = "Exclusive Masterclass Session";
+            copy.title = "Video Archive";
+            copy.titleEn = "Video Archive";
             modified = true;
           }
           if (isUrlOrDriveLinkServer(copy.titleEn)) {
@@ -1566,7 +1674,7 @@ async function triggerGitHubVideoProcessing(submission: {
         "Authorization": `Bearer ${githubToken}`,
         "Accept": "application/vnd.github.v3+json",
         "Content-Type": "application/json",
-        "User-Agent": "Queen-Milana-Studio"
+        "User-Agent": "Goddess-Luzia-Studio"
       },
       body: JSON.stringify({
         event_type: "process_video",
@@ -1765,7 +1873,7 @@ app.post("/api/admin/generate-delivery-link/:id", async (req, res) => {
   try {
     // Look up submission by id
     let storagePath: string | null = null;
-    let title: string = "Exclusive Video";
+    let title: string = "Video Archive";
 
     const { data: submission } = await supabase
       .from("content_submissions")
@@ -1799,7 +1907,7 @@ app.post("/api/admin/generate-delivery-link/:id", async (req, res) => {
     }
 
     const expiresAt = new Date(Date.now() + 86400 * 1000).toISOString();
-    const fanIdentifier = req.body?.fanIdentifier || "VIP Fan";
+    const fanIdentifier = req.body?.fanIdentifier || "Supporter";
 
     // Log to access_grants table in Supabase
     try {
@@ -1857,7 +1965,7 @@ app.post("/api/custom-media", async (req, res) => {
     const rawTitle = title ? String(title).trim() : "";
     const rawDriveLink = googleDriveLink || (isUrlOrDriveLinkServer(rawTitle) ? rawTitle : "");
     const safeTitle = isUrlOrDriveLinkServer(rawTitle) ? "Exclusive Masterclass Session" : (rawTitle || "Exclusive Masterclass Session");
-    const safeDesc = cleanServerDescription(description, "Exclusive video published by Queen Milana.");
+    const safeDesc = cleanServerDescription(description, "Exclusive video published by Goddess Luzia.");
 
     const storagePath = video_storage_path || videoStoragePath;
     const finalVideoUrl = rawDriveLink || videoUrl || previewUrl || (storagePath ? `supabase://${storagePath}` : "");
@@ -1869,8 +1977,8 @@ app.post("/api/custom-media", async (req, res) => {
       id: `custom-vid-${Date.now()}`,
       title: safeTitle,
       titleEn: safeTitle,
-      category: category ? category.trim() : "Queen Exclusive",
-      categoryEn: category ? category.trim() : "Queen Exclusive",
+      category: category ? category.trim() : "Goddess Exclusive",
+      categoryEn: category ? category.trim() : "Goddess Exclusive",
       price: parseFloat(price) || 20.00,
       previewUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
       videoUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
@@ -1881,7 +1989,7 @@ app.post("/api/custom-media", async (req, res) => {
       duration: duration || "Full length",
       description: safeDesc,
       descriptionEn: safeDesc,
-      tags: Array.isArray(tags) ? tags : ["new", "queenmilana", "exclusive"],
+      tags: Array.isArray(tags) ? tags : ["new", "goddessluzia", "exclusive"],
       createdAt: new Date().toISOString()
     };
 
@@ -1901,7 +2009,7 @@ app.post("/api/custom-media", async (req, res) => {
           google_drive_link: newItem.googleDriveLink || null,
           thumbnail_url: newItem.thumbnailUrl,
           category: newItem.category,
-          name: "Queen Milana",
+          name: "Goddess Luzia",
           description: newItem.description,
           status: "published",
           created_at: newItem.createdAt
@@ -1965,6 +2073,8 @@ app.post("/api/custom-media", async (req, res) => {
 
 // Payment & VIP Code Verification Endpoint
 const VALID_VIP_PASSCODES = new Set([
+  "LUZIA2026",
+  "GODDESSLUZIA",
   "MILANA2026",
   "QUEEN-VIP",
   "GODDESS-VIP",
@@ -2059,7 +2169,7 @@ app.post("/api/verify-payment", async (req, res) => {
     } else {
       return res.status(422).json({
         verified: false,
-        message: "Invalid transaction reference or passcode. Please check your payment receipt or enter a valid VIP passcode (e.g., MILANA2026)."
+        message: "Invalid transaction reference or code. Please check your payment receipt or enter your passcode."
       });
     }
   } catch (error: any) {
@@ -2139,7 +2249,7 @@ app.post("/api/content-submissions", async (req, res) => {
       price: price ? String(price).trim() : "20.00",
       tags: formattedTags,
       googleDriveLink: googleDriveLink.trim(),
-      name: name ? name.trim() : "Queen Milana",
+      name: name ? name.trim() : "Goddess Luzia",
       description: description ? description.trim() : "",
       createdAt: new Date().toISOString(),
       status: "pending_processing"

@@ -14,7 +14,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
 
   const tipfunderUrl = siteSettings.tipfunder_link || paymentSettings.tipfunder || 'https://tipfunder.com';
   const throneUrl = siteSettings.throne_link || paymentSettings.throne || 'https://throne.com';
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
   const currentAmount = customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,10 +33,10 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
         {/* Title & Subtitle */}
         <div className="text-center space-y-2">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-black tracking-tight">
-            Tribute & Direct Transactions
+            Support & Payment
           </h2>
           <p className="text-sm sm:text-base text-gray-600 font-medium max-w-lg mx-auto">
-            Official and secure payment channels for {creatorName}.
+            Official and secure payment options for {creatorName}.
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
                 <div className="flex items-center gap-2">
                   <Gift className="w-4 h-4 text-white" />
                   <span className="text-xs font-mono font-bold text-white uppercase">
-                    THRONE WISHLIST & TRANSACTIONS
+                    Throne Wishlist & Direct Gifts
                   </span>
                 </div>
                 <span className="text-[10px] font-mono text-white bg-neutral-900 border border-white/20 px-2 py-0.5 rounded">
@@ -58,7 +58,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
                 </span>
               </div>
               <p className="text-xs text-neutral-300">
-                Direct gifts and transactions are processed in real-time.
+                Send gifts or support directly through Throne.
               </p>
               <a
                 href={throneUrl}
@@ -66,7 +66,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
                 rel="noreferrer"
                 className="w-full py-3 rounded-xl bg-white hover:bg-gray-200 text-black font-bold text-xs uppercase font-mono tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer text-center"
               >
-                <span>Direct to Throne ({creatorName})</span>
+                <span>Open Throne ({creatorName})</span>
                 <ExternalLink className="w-3.5 h-3.5 text-black" />
               </a>
             </div>
@@ -79,7 +79,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
               <div className="space-y-2.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-800 flex items-center gap-2">
                   <CreditCard className="w-3.5 h-3.5 text-neutral-700" />
-                  <span>TIPFUNDER SELECTION</span>
+                  <span>TipFunder Support</span>
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5">
                   {[25, 50, 100, 250, 500, 1000].map((amt) => (

@@ -18,7 +18,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
 
   const tipfunderUrl = siteSettings.tipfunder_link || paymentSettings.tipfunder || 'https://tipfunder.com';
   const throneUrl = siteSettings.throne_link || paymentSettings.throne || 'https://throne.com';
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
   const currentAmount = customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
 
   const handleSubmitTipfunder = (e: React.FormEvent) => {
@@ -43,7 +43,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
         {/* Top Header Bar */}
         <div className="px-6 py-3.5 bg-gray-50/90 border-b border-gray-200/80 flex items-center justify-between">
           <span className="text-xs font-bold text-black tracking-wider uppercase">
-            {creatorName} - Payment & Tribute Portal
+            {creatorName} - Support & Payment
           </span>
           <button
             onClick={onClose}
@@ -58,10 +58,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
           
           <div className="text-center space-y-1.5">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-black tracking-tight">
-              Direct Payment & Tribute
+              Support & Payment
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto">
-              Official centralized payment channels for {creatorName}.
+              Official payment options for {creatorName}.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
                 <div className="flex items-center gap-2">
                   <Gift className="w-4 h-4 text-white" />
                   <span className="text-xs font-mono font-bold text-white uppercase">
-                    THRONE DIRECT PAYMENT & WISHLIST
+                    Throne Wishlist & Direct Gifts
                   </span>
                 </div>
                 <span className="text-[10px] font-mono text-white bg-neutral-900 border border-white/20 px-2 py-0.5 rounded">
@@ -80,7 +80,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
                 </span>
               </div>
               <p className="text-xs text-neutral-300">
-                Direct gifts and transactions through the verified Throne account of {creatorName}.
+                Send gifts or support directly through Throne.
               </p>
               <a
                 href={throneUrl}
@@ -88,7 +88,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
                 rel="noreferrer"
                 className="w-full py-3 rounded-xl bg-white hover:bg-gray-200 text-black font-bold text-xs uppercase font-mono tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer text-center"
               >
-                <span>Open Throne Portal</span>
+                <span>Open Throne</span>
                 <ExternalLink className="w-3.5 h-3.5 text-black" />
               </a>
             </div>
@@ -101,7 +101,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-neutral-800" />
                 <span className="text-xs font-bold uppercase tracking-wider text-black">
-                  TipFunder Tribute Portal
+                  TipFunder
                 </span>
               </div>
 

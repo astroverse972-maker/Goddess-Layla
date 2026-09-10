@@ -52,14 +52,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     setSubmitted(true);
   };
 
-  const generatedReceipt = `=== MAITRESSE ARIA SESSION INQUIRY ===
-Devotee Title: ${formState.devoteeTitle}
-Contact Email: ${formState.email}
+  const generatedReceipt = `=== SESSION INQUIRY ===
+Name: ${formState.devoteeTitle}
+Email: ${formState.email}
 Handle: ${formState.telegramOrX}
-Session Offered: ${formState.sessionType}
+Session: ${formState.sessionType}
 Preferred Date: ${formState.preferredDate || 'Flexible'}
-Estimated Tribute: $${formState.tributeAmount} USD
-Protocol Status: ${formState.protocolAccepted ? 'VERIFIED' : 'PENDING'}
+Estimated Price: $${formState.tributeAmount} USD
+Terms Accepted: ${formState.protocolAccepted ? 'YES' : 'PENDING'}
 Notes: ${formState.customNotes || 'None'}
 Timestamp: ${new Date().toLocaleString()}`;
 
@@ -76,8 +76,8 @@ Timestamp: ${new Date().toLocaleString()}`;
         {/* Modal Top Header */}
         <div className="bg-white/5 backdrop-blur-2xl px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Crown className="w-5 h-5 text-amber-300" />
-            <h3 className="font-sans font-bold text-lg text-white">Direct Consultation Inquiry</h3>
+            <Calendar className="w-5 h-5 text-amber-300" />
+            <h3 className="font-sans font-bold text-lg text-white">Book a Session</h3>
           </div>
           <button
             onClick={onClose}
@@ -96,37 +96,37 @@ Timestamp: ${new Date().toLocaleString()}`;
               <div className={`p-4 rounded-2xl border flex items-center gap-3 text-xs ${
                 protocolVerified
                   ? 'btn-liquid-secondary border-emerald-500/40 text-emerald-300'
-                  : 'btn-liquid-secondary border-rose-500/40 text-rose-300'
+                  : 'btn-liquid-secondary border-neutral-500/40 text-neutral-300'
               }`}>
                 <ShieldCheck className="w-5 h-5 flex-shrink-0" />
                 <span>
                   {protocolVerified
-                    ? 'Protocol Verification Active: Your inquiry will receive priority evaluation.'
-                    : 'Protocol Verification Unverified: Please ensure you review The Codex before submitting.'}
+                    ? 'Guidelines acknowledged: Your inquiry will be reviewed promptly.'
+                    : 'Please make sure to review our session guidelines before booking.'}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-mono text-rose-300 uppercase">Devotee Title / Name</label>
+                  <label className="text-xs font-mono text-neutral-300 uppercase">Your Name</label>
                   <input
                     type="text"
                     required
                     value={formState.devoteeTitle}
                     onChange={(e) => setFormState({ ...formState, devoteeTitle: e.target.value })}
-                    placeholder="e.g. Inquirer Marcus"
+                    placeholder="e.g. Marcus"
                     className="w-full liquid-input rounded-2xl px-4 py-3 text-xs text-white mt-1 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono text-rose-300 uppercase">Email Address</label>
+                  <label className="text-xs font-mono text-neutral-300 uppercase">Email Address</label>
                   <input
                     type="email"
                     required
                     value={formState.email}
                     onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                    placeholder="devotee@sanctum.com"
+                    placeholder="yourname@example.com"
                     className="w-full liquid-input rounded-2xl px-4 py-3 text-xs text-white mt-1 focus:outline-none"
                   />
                 </div>
@@ -134,7 +134,7 @@ Timestamp: ${new Date().toLocaleString()}`;
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-mono text-rose-300 uppercase">Telegram / X Handle</label>
+                  <label className="text-xs font-mono text-neutral-300 uppercase">Telegram / X Handle</label>
                   <input
                     type="text"
                     value={formState.telegramOrX}
@@ -145,7 +145,7 @@ Timestamp: ${new Date().toLocaleString()}`;
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono text-rose-300 uppercase">Preferred Session Date</label>
+                  <label className="text-xs font-mono text-neutral-300 uppercase">Preferred Session Date</label>
                   <input
                     type="date"
                     value={formState.preferredDate}
@@ -156,7 +156,7 @@ Timestamp: ${new Date().toLocaleString()}`;
               </div>
 
               <div>
-                <label className="text-xs font-mono text-rose-300 uppercase">Selected Session Offering</label>
+                <label className="text-xs font-mono text-neutral-300 uppercase">Selected Session Offering</label>
                 <select
                   value={formState.sessionType}
                   onChange={(e) => setFormState({ ...formState, sessionType: e.target.value })}
@@ -169,12 +169,12 @@ Timestamp: ${new Date().toLocaleString()}`;
               </div>
 
               <div>
-                <label className="text-xs font-mono text-rose-300 uppercase">Custom Requests / Budget Statement</label>
+                <label className="text-xs font-mono text-neutral-300 uppercase">Custom Requests / Notes</label>
                 <textarea
                   rows={3}
                   value={formState.customNotes}
                   onChange={(e) => setFormState({ ...formState, customNotes: e.target.value })}
-                  placeholder="Detail your goals, triggers, or specific boundaries..."
+                  placeholder="Detail any preferences, questions, or specific topics..."
                   className="w-full liquid-input rounded-2xl p-4 text-xs text-white mt-1 focus:outline-none"
                 />
               </div>
@@ -188,7 +188,7 @@ Timestamp: ${new Date().toLocaleString()}`;
                   className="rounded-lg border-white/20 bg-white/10 accent-amber-400 w-4 h-4"
                 />
                 <label htmlFor="modal-protocol" className="text-xs text-neutral-300 font-normal">
-                  I solemnly pledge that I have read and agree to all clauses in The Codex.
+                  I confirm that I have read and agree to the guidelines.
                 </label>
               </div>
 
@@ -197,7 +197,7 @@ Timestamp: ${new Date().toLocaleString()}`;
                 className="w-full py-4 btn-liquid-gold text-neutral-950 font-mono text-xs uppercase font-bold rounded-full shadow-xl flex items-center justify-center gap-2 animate-shimmer-sheen overflow-hidden"
               >
                 <Send className="w-4 h-4" />
-                <span>Submit Inquiry Payload</span>
+                <span>Submit Inquiry</span>
               </button>
             </form>
           ) : (
@@ -205,9 +205,9 @@ Timestamp: ${new Date().toLocaleString()}`;
               <div className="w-14 h-14 rounded-full btn-liquid-gold text-neutral-950 mx-auto flex items-center justify-center shadow-lg">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h4 className="font-sans font-bold text-2xl text-white">Inquiry Generated & Vaulted</h4>
+              <h4 className="font-sans font-bold text-2xl text-white">Inquiry Received</h4>
               <p className="text-xs text-neutral-300 font-normal max-w-md mx-auto">
-                Your consultation request payload has been generated. Copy your payload code below for direct transmission via email or Telegram.
+                Your request has been generated. You can copy your inquiry details below to send directly via email or Telegram.
               </p>
 
               <div className="p-4 bg-black/60 border border-white/10 rounded-2xl text-left font-mono text-xs text-amber-200/90 whitespace-pre-wrap">
@@ -220,7 +220,7 @@ Timestamp: ${new Date().toLocaleString()}`;
                   className="px-6 py-3 btn-liquid-primary text-amber-200 rounded-full text-xs font-mono uppercase flex items-center gap-2"
                 >
                   {copiedPayload ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiedPayload ? 'Payload Copied' : 'Copy Inquiry Text'}</span>
+                  <span>{copiedPayload ? 'Copied' : 'Copy Inquiry Text'}</span>
                 </button>
 
                 <button

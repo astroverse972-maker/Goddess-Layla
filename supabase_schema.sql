@@ -149,12 +149,36 @@ CREATE POLICY "Allow public all on payment_settings"
 
 
 -- ====================================================================
+-- TABLE: PROMO BANNER CLIPS (Apple-Style Rotating Promotional Video Showcase)
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.promo_banner_clips (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Promo Showcase Clip',
+  google_drive_link TEXT,
+  video_url TEXT,
+  thumbnail_url TEXT,
+  text_overlay TEXT,
+  announcement_badge TEXT DEFAULT 'VIP SHOWCASE',
+  display_order INT DEFAULT 1,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.promo_banner_clips ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public all on promo_banner_clips"
+  ON public.promo_banner_clips FOR ALL USING (true) WITH CHECK (true);
+
+-- ====================================================================
 -- INITIAL SEED DATA
--- Default passcode (1234), profile, and payment settings.
+-- Default passcode, profile, payment, and promo banner settings.
 -- ====================================================================
 INSERT INTO public.site_settings (key, value)
 VALUES 
   ('admin_passcode', '"1234"'::jsonb),
-  ('live_stream_status', '{"isLive": false, "title": "QUEEN MILANA LIVE EXCLUSIVE", "description": "Exclusive live private session", "price": "50.00", "streamUrl": "https://i.imgur.com/m0CSW44.mp4"}'::jsonb),
-  ('creator_profile', '{"name": "Queen Milana", "bio": "Welcome to my official VIP sanctuary.", "gallery": ["https://i.imgur.com/STRpELi.jpg", "https://i.imgur.com/bjTQJK7.jpg", "https://i.imgur.com/tzmLquQ.jpg", "https://i.imgur.com/g5fQwuf.jpg"]}'::jsonb),
-  ('payment_settings', '{"tipfunder": "https://www.tipfunder.com/Geldherrinlay9", "throne": "https://throne.com/geldherrinlayla", "telegram": "https://t.me/laylathebest", "x": "https://x.com/Geldherrinlay9"}'::jsonb);
+  ('promo_banner_config', '{"global_text_overlay": "Special Promotion • Inquire for VIP Privilege Archives", "rotation_interval_sec": 6, "clips": []}'::jsonb),
+  ('creator_profile', '{"name": "Goddess Luzia", "bio": "Welcome to my official VIP sanctuary.", "gallery": []}'::jsonb),
+  ('payment_settings', '{"tipfunder": "", "throne": "https://throne.com/goddessluzia", "telegram": "https://t.me/goddessluzia", "x": "https://x.com/goddessluzia"}'::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+

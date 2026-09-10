@@ -32,21 +32,21 @@ export const CodexProtocol: React.FC<CodexProtocolProps> = ({ protocolVerified, 
         
         {/* Section Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-rose-200">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full btn-liquid-secondary text-xs font-mono uppercase tracking-widest text-neutral-200">
             <Scroll className="w-3.5 h-3.5 text-amber-300" />
-            <span>Rules of Engagement</span>
+            <span>Guidelines & Etiquette</span>
           </div>
           <h2 className="font-sans text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
-            THE CODEX & PROTOCOL
+            SESSION GUIDELINES
           </h2>
           <p className="text-neutral-400 text-sm max-w-xl mx-auto font-normal">
-            Adherence to protocol is mandatory. Review each clause carefully before attempting communication or submitting a session inquiry.
+            Please read these guidelines carefully before getting in touch or booking a session.
           </p>
         </div>
 
         {/* Category Tabs as Liquid Glass Pills */}
         <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 max-w-fit mx-auto">
-          {['all', 'etiquette', 'tribute', 'sessions', 'boundaries'].map((cat) => (
+          {['all', 'etiquette', 'payment', 'sessions', 'boundaries'].map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
@@ -72,7 +72,7 @@ export const CodexProtocol: React.FC<CodexProtocolProps> = ({ protocolVerified, 
                 key={rule.id}
                 className={`p-6 rounded-3xl liquid-card transition-all duration-300 ${
                   isChecked
-                    ? 'border-rose-500/50 bg-rose-950/20 shadow-[0_0_25px_rgba(244,63,94,0.15)]'
+                    ? 'border-neutral-500/50 bg-neutral-900/40 shadow-[0_0_25px_rgba(255,255,255,0.05)]'
                     : ''
                 }`}
               >
@@ -94,8 +94,8 @@ export const CodexProtocol: React.FC<CodexProtocolProps> = ({ protocolVerified, 
                       <div className="flex items-center gap-2">
                         <h3 className="font-sans font-bold text-lg text-white">{rule.title}</h3>
                         {rule.mandatory && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            Mandatory
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Required
                           </span>
                         )}
                       </div>
@@ -126,24 +126,24 @@ export const CodexProtocol: React.FC<CodexProtocolProps> = ({ protocolVerified, 
         <div className={`p-6 sm:p-8 rounded-3xl liquid-card flex flex-col sm:flex-row items-center justify-between gap-6 transition-all ${
           protocolVerified
             ? 'border-emerald-500/50 shadow-[0_0_35px_rgba(16,185,129,0.2)]'
-            : 'border-rose-500/30'
+            : 'border-neutral-500/30'
         }`}>
           <div className="flex items-center gap-4">
             <div className={`p-3.5 rounded-2xl border ${
               protocolVerified
                 ? 'btn-liquid-secondary text-emerald-400 border-emerald-500/40'
-                : 'btn-liquid-secondary text-rose-400 border-rose-500/40'
+                : 'btn-liquid-secondary text-neutral-400 border-neutral-500/40'
             }`}>
               {protocolVerified ? <Award className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
             </div>
             <div>
               <h4 className="font-sans font-bold text-lg text-white">
-                {protocolVerified ? 'Protocol Verification Active' : 'Protocol Verification Pending'}
+                {protocolVerified ? 'Guidelines Acknowledged' : 'Review Required'}
               </h4>
               <p className="text-xs text-neutral-400 font-normal mt-0.5">
                 {protocolVerified
-                  ? 'All mandatory clauses acknowledged. You are permitted to submit direct consultation inquiries.'
-                  : 'Check off mandatory rules above to activate your verified devotee status.'}
+                  ? 'All required guidelines acknowledged. You can proceed with booking an inquiry.'
+                  : 'Check off the required guidelines above to proceed.'}
               </p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export const CodexProtocol: React.FC<CodexProtocolProps> = ({ protocolVerified, 
                 ? 'btn-liquid-gold text-amber-200'
                 : 'btn-liquid-secondary text-neutral-400'
             }`}>
-              {protocolVerified ? 'Verified Devotee' : 'Unverified'}
+              {protocolVerified ? 'Confirmed' : 'Pending'}
             </span>
           </div>
         </div>

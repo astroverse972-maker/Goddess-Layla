@@ -62,8 +62,8 @@ const defaultCentralSettings: CentralSiteSettings = {
   twitter_link: SOCIAL_LINKS.x || "",
   telegram_link: SOCIAL_LINKS.telegram || "",
   tipfunder_link: SOCIAL_LINKS.tipfunder || "",
-  creator_name: "Queen Milana",
-  about_text: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  creator_name: "Goddess Luzia",
+  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
   avatar_url: "",
   about_photos: [],
 
@@ -72,8 +72,8 @@ const defaultCentralSettings: CentralSiteSettings = {
   x: SOCIAL_LINKS.x || "",
   telegram: SOCIAL_LINKS.telegram || "",
   tipfunder: SOCIAL_LINKS.tipfunder || "",
-  name: "Queen Milana",
-  bio: "Welkom in het officiële VIP heiligdom van Queen Milana. Exclusieve archieven, transacties en live stream autorisaties verlopen via gecentraliseerde beveiligingskanalen.",
+  name: "Goddess Luzia",
+  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
   avatar: "",
   gallery: []
 };
@@ -290,7 +290,7 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const creatorProfile: CreatorProfile = {
-    name: siteSettings.creator_name || 'Queen Milana',
+    name: siteSettings.creator_name || 'Goddess Luzia',
     avatar: siteSettings.avatar_url,
     bio: siteSettings.about_text,
     gallery: siteSettings.about_photos,

@@ -11,12 +11,12 @@ interface ContactModalProps {
 export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
-  const [sessionType, setSessionType] = useState('VIP Sanctuary / Custom Request');
+  const [sessionType, setSessionType] = useState('General Inquiry / Custom Request');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const { paymentSettings, creatorProfile } = useSiteSettings();
 
-  const creatorName = creatorProfile.name || 'Goddess Milana';
+  const creatorName = creatorProfile.name || 'Goddess Luzia';
 
   if (!isOpen) return null;
 
@@ -61,7 +61,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
           <div className="text-center space-y-1">
             <h4 className="font-serif text-2xl font-bold text-black">{creatorName}</h4>
             <p className="text-xs text-gray-500 font-medium">
-              Official VIP Sanctuary Contact
+              Official Contact Form
             </p>
           </div>
 
@@ -105,10 +105,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                 onChange={(e) => setSessionType(e.target.value)}
                 className="w-full mt-1.5 px-4 py-3 rounded-2xl bg-gray-100/80 border border-gray-200/80 text-sm font-medium text-black focus:bg-white focus:border-black focus:outline-hidden transition-all cursor-pointer"
               >
-                <option>VIP Sanctuary / Custom Request</option>
-                <option>Private Live Stream Booking</option>
+                <option>General Inquiry / Custom Request</option>
                 <option>Custom Video Order</option>
-                <option>TipFunder Verification</option>
+                <option>Session Inquiry</option>
+                <option>TipFunder Support</option>
               </select>
             </div>
 

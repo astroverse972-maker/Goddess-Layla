@@ -26,7 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
   const xLink = siteSettings.twitter_link || paymentSettings.x;
   const telegramLink = siteSettings.telegram_link || paymentSettings.telegram;
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shadow-2xs transition-all font-sans">
@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="px-3.5 py-2 rounded-full bg-black text-white hover:bg-gray-800 text-xs font-semibold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
             >
               <Gift className="w-3.5 h-3.5 text-white" />
-              <span>Throne Direct</span>
+              <span>Throne</span>
             </a>
           )}
 
@@ -73,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="px-3.5 py-2 rounded-full bg-gray-100/80 hover:bg-gray-200/90 text-black border border-gray-200/70 text-xs font-semibold backdrop-blur-md transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
             >
               <CreditCard className="w-3.5 h-3.5 text-black" />
-              <span>TipFunder Tribute</span>
+              <span>TipFunder</span>
             </button>
           )}
 

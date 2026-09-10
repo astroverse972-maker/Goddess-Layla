@@ -34,8 +34,8 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
     return () => clearInterval(timer);
   }, [gallerySlides.length]);
 
-  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Queen Milana';
-  const bioText = siteSettings.about_text || creatorProfile.bio || 'Welcome to the official VIP sanctuary of Queen Milana. Exclusive archives, custom commissions, and private live stream authorizations through centralized secure channels.';
+  const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
+  const bioText = siteSettings.about_text || creatorProfile.bio || 'Welkom op de officiële website van Goddess Luzia. Bekijk video\'s, teasers en bestel content veilig via Throne of TipFunder.';
   const throneLink = siteSettings.throne_link || paymentSettings.throne;
   const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
   const xLink = siteSettings.twitter_link || paymentSettings.x;
@@ -62,7 +62,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                 <span>
                   Telegram:{' '}
                   <a href={telegramLink} target="_blank" rel="noreferrer" className="underline hover:text-black">
-                    VIP Sanctuary
+                    Telegram Channel
                   </a>
                 </span>
               </div>
@@ -73,7 +73,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
           <div className="p-4 sm:p-6 bg-gray-50/90 text-black rounded-2xl sm:rounded-3xl border border-gray-200/80 space-y-3 shadow-xs">
             
             <div className="text-sm sm:text-base font-bold tracking-tight text-black flex items-center gap-2">
-              <span>Official VIP Sanctuary</span>
+              <span>About {creatorName}</span>
             </div>
 
             <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-medium whitespace-pre-line">
@@ -90,7 +90,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                     <li>
                       Throne:{' '}
                       <a href={throneLink} target="_blank" rel="noreferrer" className="underline font-semibold">
-                        Official Wishlist & Direct Tribute
+                        Wishlist & Gifts
                       </a>
                     </li>
                   )}
@@ -98,7 +98,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                     <li>
                       TipFunder:{' '}
                       <a href={tipfunderLink} target="_blank" rel="noreferrer" className="underline font-semibold">
-                        TipFunder Tribute Portal
+                        Tips & Support
                       </a>
                     </li>
                   )}
@@ -114,7 +114,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                     <li>
                       Telegram:{' '}
                       <a href={telegramLink} target="_blank" rel="noreferrer" className="underline font-semibold">
-                        Official VIP Telegram Channel
+                        Telegram Channel
                       </a>
                     </li>
                   )}
@@ -211,7 +211,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                   {creatorName}
                 </h3>
                 <p className="text-xs text-neutral-400 font-mono uppercase tracking-widest">
-                  OFFICIAL VIP SANCTUARY
+                  Official Website
                 </p>
               </div>
             </div>

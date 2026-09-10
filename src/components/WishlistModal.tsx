@@ -20,7 +20,7 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({ isOpen, onClose })
           <div className="flex items-center gap-2">
             <Heart className="w-5 h-5 text-black fill-black" />
             <h3 className="font-serif font-bold text-lg text-gray-900">
-              Gifts & Tribute Portal
+              Wishlist & Tips
             </h3>
           </div>
           <button
@@ -35,9 +35,9 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({ isOpen, onClose })
         <div className="p-6 sm:p-8 space-y-6">
           
           <div className="text-center space-y-1">
-            <h4 className="font-serif text-2xl font-extrabold text-gray-900">Goddess Milana</h4>
+            <h4 className="font-serif text-2xl font-extrabold text-gray-900">Goddess Luzia</h4>
             <p className="text-xs text-gray-500 font-medium">
-              Send gifts and tributes directly to Goddess Milana.
+              Support Goddess Luzia or send gifts through official wishlist channels.
             </p>
           </div>
 

@@ -20,7 +20,7 @@ export function isUrlOrDriveLink(str: string | null | undefined): boolean {
 
 export function cleanDisplayTitle(
   title?: string | null,
-  fallback = 'Exclusive Masterclass Archive'
+  fallback = 'Video Archive'
 ): string {
   if (!title || typeof title !== 'string') return fallback;
   const trimmed = title.trim();
@@ -32,7 +32,7 @@ export function cleanDisplayTitle(
 
 export function cleanDisplayDescription(
   desc?: string | null,
-  fallback = 'Exclusive encrypted masterclass video archive for authorized devotees.'
+  fallback = 'High quality video archive available upon purchase.'
 ): string {
   if (!desc || typeof desc !== 'string') return fallback;
   const trimmed = desc.trim();

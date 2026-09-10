@@ -3,79 +3,79 @@ import { SessionOffering, CodexRule, AudioTeaser, TributeItem, DevotionLog } fro
 export const SESSION_OFFERINGS: SessionOffering[] = [
   {
     id: 's-in-person',
-    title: 'Private In-Person Consultation & Session',
+    title: 'Private In-Person Session',
     category: 'in-person',
     price: 1200,
     duration: '120 Minutes',
-    description: 'An exclusive, tailor-made private session in an atmosphere of unmatched dark luxury. Unfiltered presence, sensory protocol, and customized dominance.',
-    prerequisites: ['Initial Tribute Paid ($250 Minimum)', 'The Codex Signed & Verified', 'Direct Identity Verification'],
+    description: 'A private one-on-one session customized to your preferences and boundaries in a discreet, upscale environment.',
+    prerequisites: ['Deposit Required', 'Guidelines Agreement', 'Identity Verification'],
     features: [
-      'Private High-End Studio Sanctum',
-      'Custom Sensory & Posture Protocol',
-      'Formal Inspection & Guidance',
-      'Exclusive After-Care Consultation'
+      'Private Studio Space',
+      'Customized Session Plan',
+      'Safety & Consent Check',
+      'Post-Session Debrief'
     ],
     popular: true
   },
   {
     id: 's-findom',
-    title: 'Financial Domination & Silent Tribute Tier',
+    title: 'Ongoing Support & Tipping',
     category: 'findom',
     price: 350,
-    duration: 'Continuous / Monthly',
-    description: 'Relinquish financial control to your Empress. Establish daily tribute routines, drain tasks, and financial submission protocols under strict oversight.',
-    prerequisites: ['Minimum Initial Drain ($150)', 'Complete Budget Statement Disclosure'],
+    duration: 'Monthly / Flexible',
+    description: 'Direct recurring support and personalized communication channel for regular supporters.',
+    prerequisites: ['Initial Confirmation', 'Established Budget Agreement'],
     features: [
-      'Daily/Weekly Auto-Tribute Assignments',
-      'Surrender Accounts & Wallet Lock Options',
-      'Direct Telegram Priority Access',
-      'Public or Anonymous Devotee Badge'
+      'Regular Check-ins',
+      'Flexible Contribution Options',
+      'Priority Telegram Contact',
+      'Supporter Acknowledgement'
     ]
   },
   {
     id: 's-chastity',
-    title: 'Absolute Chastity Management & Keyholding',
+    title: 'Discipline & Coaching Program',
     category: 'chastity',
     price: 450,
-    duration: '30 Days Lock Period',
-    description: 'Surrender your key and physical desires to Maitresse Aria. Daily photo verification, task assignments, and strict release criteria.',
-    prerequisites: ['Physical Lock Verification', 'The Codex Agreement', 'Daily Morning/Evening Check-in Duty'],
+    duration: '30-Day Program',
+    description: 'Structured daily habits, task coaching, and accountability tracking over a full month.',
+    prerequisites: ['Agreement to Rules', 'Daily Check-in Commitment'],
     features: [
-      'Cryptographic Key Vaulting',
-      'Daily Task & Inspection Quotas',
-      'Denial & Tease Audio Assignments',
-      'Release Approval or Lock Extension'
+      'Custom Routine Design',
+      'Daily Check-in Schedule',
+      'Progress Reviews',
+      'Completion Milestone'
     ],
     popular: true
   },
   {
     id: 's-custom-audio',
-    title: 'Custom Audio Voice Command & Hypnosis',
+    title: 'Custom Voice Audio Recording',
     category: 'custom-media',
     price: 200,
     duration: '10-15 Minutes Bespoke MP3',
-    description: 'Bespoke high-fidelity voice recording produced specifically for your name, triggers, and psychological conditioning.',
-    prerequisites: ['Detailed Preference Form Submission', 'Full Pre-Payment Tribute'],
+    description: 'Custom high-quality audio file tailored to your personal preferences and topics of choice.',
+    prerequisites: ['Preference Questionnaire', 'Full Payment Upfront'],
     features: [
-      '320kbps High-Fidelity Master File',
-      'Bespoke Script Tailored to Your Triggers',
-      'Subliminal Dark Binaural Audio Layers',
-      'Lifetime Personal Vault Access'
+      'High-Quality Studio Audio',
+      'Custom Script & Topic',
+      'Prompt Digital Delivery',
+      'Permanent Personal Download'
     ]
   },
   {
     id: 's-virtual-worship',
-    title: 'Virtual Live Worship & Command Session',
+    title: '1-on-1 Private Video Call',
     category: 'virtual',
     price: 400,
-    duration: '45 Minutes 1-on-1 Video',
-    description: 'Direct high-definition encrypted live session. Posture command, task execution, verbal dominance, and inspection.',
-    prerequisites: ['Camera & Mic Verification', 'Pre-Session Protocol Agreement'],
+    duration: '45 Minutes Private Video Call',
+    description: 'Direct high-definition private video session focused on personalized conversation and activities.',
+    prerequisites: ['Camera & Mic Check', 'Session Guidelines Agreement'],
     features: [
-      'End-to-End Encrypted Video Portal',
-      'Real-Time Task Execution',
-      'Post-Session Reflection Duty',
-      'Instant Recording Access (Optional)'
+      'Private Encrypted Video Room',
+      'Interactive One-on-One Time',
+      'Clear Boundaries & Safety',
+      'Optional Call Summary'
     ]
   }
 ];
@@ -83,34 +83,34 @@ export const SESSION_OFFERINGS: SessionOffering[] = [
 export const CODEX_RULES: CodexRule[] = [
   {
     id: 'rule-1',
-    title: 'Addressing Maitresse Aria',
+    title: 'Respectful Communication',
     category: 'etiquette',
-    summary: 'Protocol regarding forms of address and respectful communication.',
-    fullDetails: 'Every communication must begin with proper deferential titles: "Maitresse Aria", "My Empress", or "Mistress". Casual greetings like "Hey", "Hi", or "WYD" result in immediate permanent blocking.',
+    summary: 'Clear, polite, and respectful communication is required at all times.',
+    fullDetails: 'Please keep all messages polite, clear, and direct. Rude, demanding, or inappropriate messages without introduction will be ignored.',
     mandatory: true
   },
   {
     id: 'rule-2',
-    title: 'The Tribute Prerequisite',
+    title: 'Payment & Deposits',
     category: 'tribute',
-    summary: 'Time and attention are premium assets requiring initial tribute.',
-    fullDetails: 'Messages submitted without an accompanying tribute are disregarded. Tribute proves serious intent and respect for Maitresse Aria\'s time. Minimum consultation tribute is $100.',
+    summary: 'All services and custom content require payment or deposit before delivery.',
+    fullDetails: 'To respect scheduling and time commitment, orders and bookings must be confirmed with full payment or an agreed deposit.',
     mandatory: true
   },
   {
     id: 'rule-3',
-    title: 'Absolute Confidentiality & Consent',
+    title: 'Confidentiality & Privacy',
     category: 'boundaries',
-    summary: 'Privacy is paramount for both Empress and Devotee.',
-    fullDetails: 'All session details, communication, audio orders, and identities remain strictly confidential under mutual non-disclosure. No unauthorized screenshots or leaks under any circumstance.',
+    summary: 'Both parties agree to strict mutual privacy and confidentiality.',
+    fullDetails: 'All communications, video purchases, and session details are strictly confidential. Sharing, recording, or publishing content without explicit written consent is prohibited.',
     mandatory: true
   },
   {
     id: 'rule-4',
-    title: 'Session Punctuality & Preparation',
+    title: 'Punctuality & Cancellation Policy',
     category: 'sessions',
-    summary: 'Strict adherence to scheduled times and preparation protocols.',
-    fullDetails: 'Devotees must be online or present 10 minutes prior to scheduled session time with all required items ready. Late arrival reduces session time without tribute refund.',
+    summary: 'Please be on time for scheduled sessions and appointments.',
+    fullDetails: 'Please arrive or log in on time. Cancellations must be communicated at least 24 hours in advance to reschedule without penalty.',
     mandatory: false
   }
 ];
@@ -118,107 +118,107 @@ export const CODEX_RULES: CodexRule[] = [
 export const AUDIO_TEASERS: AudioTeaser[] = [
   {
     id: 'aud-1',
-    title: 'The Privilege of Obedience',
+    title: 'Calm Introduction & Welcome',
     duration: '1:45',
-    category: 'Whisper & Hypnosis',
+    category: 'Audio Sample',
     synthFrequency: 220,
-    description: 'An introductory velvet voice teaser exploring the serenity of surrender.'
+    description: 'A relaxing introductory audio sample showcasing voice tone and pacing.'
   },
   {
     id: 'aud-2',
-    title: 'Silent Tribute Protocol',
+    title: 'Guided Focus Routine',
     duration: '2:10',
-    category: 'Protocol Instruction',
+    category: 'Instruction',
     synthFrequency: 330,
-    description: 'Direct commands detailing how a true devotee honors Maitresse Aria without speech.'
+    description: 'A sample guided focus exercise with clear verbal instructions.'
   },
   {
     id: 'aud-3',
-    title: 'Chastity Verification Routine',
+    title: 'Daily Routine Overview',
     duration: '1:15',
-    category: 'Task Assignment',
+    category: 'Coaching',
     synthFrequency: 180,
-    description: 'Inspection procedure and posture commands for locked submissives.'
+    description: 'A brief preview of a structured daily accountability audio session.'
   },
   {
     id: 'aud-4',
-    title: 'The Financial Drain Ritual',
+    title: 'Evening Reflection Sample',
     duration: '2:40',
-    category: 'Humiliation',
+    category: 'Sample',
     synthFrequency: 290,
-    description: 'High-contrast verbal dominance on the vanity of material wealth.'
+    description: 'An evening relaxation and mindfulness voice clip.'
   }
 ];
 
 export const WISHLIST_ITEMS: TributeItem[] = [
   {
     id: 'w-1',
-    name: 'Throne Crown & Silk Robe Collection',
+    name: 'Silk Robe & Outfit Wardrobe',
     category: 'Wishlist',
     price: 450,
-    linkText: 'Fulfill on Throne',
-    description: 'Bespoke black silk kimono and obsidian crown for photoshoot set styling.',
+    linkText: 'Send via Throne',
+    description: 'Wardrobe and styling pieces for upcoming video shoots and photos.',
     urgency: 'high'
   },
   {
     id: 'w-2',
-    name: 'Sanctum Studio Lighting & Sound Upgrade',
+    name: 'Studio Lighting & Audio Equipment',
     category: 'Wishlist',
     price: 850,
-    linkText: 'Sponsor Studio Set',
-    description: 'High-end studio microphones for custom binaural audio master recordings.',
+    linkText: 'Support on Throne',
+    description: 'High-end studio microphone and lighting for video and audio production.',
     urgency: 'medium'
   },
   {
     id: 'w-3',
-    name: 'Direct CashApp Drain / Coffee Tribute',
-    category: 'Direct Tribute',
+    name: 'Tip via TipFunder',
+    category: 'Direct Tip',
     price: 100,
-    linkText: 'Send Instant Drain',
-    description: 'Direct cash tribute for immediate recognition and priority chat evaluation.'
+    linkText: 'Send Tip',
+    description: 'Direct tip to show support and appreciate new video releases.'
   },
   {
     id: 'w-4',
-    name: 'Crypto Vault Tribute (BTC / ETH)',
-    category: 'Crypto',
+    name: 'Direct Support',
+    category: 'Direct',
     price: 500,
-    linkText: 'View Crypto Address',
-    description: 'Anonymized high-value cryptocurrency tribute directly to Maitresse Aria\'s ledger.'
+    linkText: 'Support Directly',
+    description: 'Direct contributions to fund future creative video projects.'
   }
 ];
 
 export const DEVOTION_LOGS: DevotionLog[] = [
   {
     id: 'log-1',
-    devoteeName: 'Submissive #4092 (Chastity Key)',
+    devoteeName: 'Supporter Alex',
     amount: 500,
     timestamp: '2 Hours Ago',
-    message: 'Grateful for 60 continuous days under lock. Thank you, Empress Aria.',
-    badge: 'Chastity Devotee'
+    message: 'Delighted with the coaching program progress. Thank you!',
+    badge: 'Verified Member'
   },
   {
     id: 'log-2',
-    devoteeName: 'Devotee Marcus G.',
+    devoteeName: 'Marcus G.',
     amount: 1200,
     timestamp: 'Yesterday',
-    message: 'Tribute paid for private studio session. The Codex has been signed.',
-    badge: 'High Tier Inquirer'
+    message: 'Private session confirmed. Looking forward to our appointment.',
+    badge: 'Private Session'
   },
   {
     id: 'log-3',
-    devoteeName: 'Anonymous Drain #88',
+    devoteeName: 'Anonymous Supporter',
     amount: 350,
     timestamp: '3 Days Ago',
-    message: 'Silent Tribute sent as requested. No reply expected.',
-    badge: 'Silent Drain'
+    message: 'Monthly tip sent via TipFunder.',
+    badge: 'Tip Supporter'
   },
   {
     id: 'log-4',
-    devoteeName: 'Devotee Julian V.',
+    devoteeName: 'Julian V.',
     amount: 250,
     timestamp: '4 Days Ago',
-    message: 'Custom audio order received. Her voice commands are transformative.',
-    badge: 'Audio Collector'
+    message: 'Received the custom audio file today. Exceptional sound quality.',
+    badge: 'Custom Order'
   }
 ];
 
@@ -230,6 +230,6 @@ export const SOCIAL_LINKS = {
   loyalfans: 'https://loyalfans.com',
   telegram: 'https://t.me',
   discord: 'https://discord.gg',
-  cashapp: '$MaitresseAria',
-  email: 'inquiries@maitressearia.com'
+  cashapp: '$GoddessLuzia',
+  email: 'contact@goddessluzia.com'
 };
