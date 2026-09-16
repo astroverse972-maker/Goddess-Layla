@@ -1663,6 +1663,54 @@ app.get("/api/custom-media", async (req, res) => {
   });
 });
 
+// Endpoint to list photos from Luzia Pic folder in luzia bucket
+app.get(["/api/luzia-photos", "/api/gallery-photos"], async (req, res) => {
+  try {
+    const supabase = getSupabaseServerClient();
+    if (!supabase) {
+      return res.json({ success: false, photos: [], message: "Supabase not configured" });
+    }
+
+    const bucketsToTry = ["luzia", "Luzia"];
+    const foldersToTry = ["Luzia Pic", "luzia pic", "Luzia%20Pic"];
+
+    for (const b of bucketsToTry) {
+      for (const f of foldersToTry) {
+        const { data, error } = await supabase.storage.from(b).list(f, {
+          limit: 100,
+          sortBy: { column: "name", order: "asc" }
+        });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const files = data.filter(
+            (item: any) => item.name && !item.name.startsWith(".") && !item.name.endsWith("/")
+          );
+
+          if (files.length > 0) {
+            const urls = files.map((item: any) => {
+              const { data: pubData } = supabase.storage.from(b).getPublicUrl(`${f}/${item.name}`);
+              return pubData.publicUrl;
+            });
+
+            return res.json({
+              success: true,
+              bucket: b,
+              folder: f,
+              count: urls.length,
+              photos: urls
+            });
+          }
+        }
+      }
+    }
+
+    return res.json({ success: true, photos: [], count: 0 });
+  } catch (err: any) {
+    console.warn("Error fetching luzia gallery photos:", err);
+    return res.status(500).json({ success: false, error: err.message, photos: [] });
+  }
+});
+
 // Storage & Video Processing Helpers
 async function triggerGitHubVideoProcessing(submission: {
   id: string;
@@ -1991,7 +2039,9 @@ app.post("/api/custom-media", async (req, res) => {
       thumbnailUrl,
       duration,
       description,
-      tags
+      tags,
+      trailerUrl,
+      trailer_url
     } = req.body;
 
     const rawTitle = title ? String(title).trim() : "";
@@ -2004,6 +2054,8 @@ app.post("/api/custom-media", async (req, res) => {
     if (!rawTitle || (!finalVideoUrl && !storagePath)) {
       return res.status(400).json({ error: "Title and video source or storage path are required." });
     }
+
+    const cleanTrailer = trailerUrl ? String(trailerUrl).trim() : (trailer_url ? String(trailer_url).trim() : "");
 
     const newItem = {
       id: `custom-vid-${Date.now()}`,
@@ -2018,6 +2070,7 @@ app.post("/api/custom-media", async (req, res) => {
       video_storage_path: storagePath || null,
       videoStoragePath: storagePath || null,
       thumbnailUrl: thumbnailUrl || "https://i.imgur.com/g5fQwuf.jpg",
+      trailerUrl: cleanTrailer || null,
       duration: duration || "Full length",
       description: safeDesc,
       descriptionEn: safeDesc,
@@ -2098,6 +2151,65 @@ app.post("/api/custom-media", async (req, res) => {
       supabaseResult,
       githubActionResult
     });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Update Video (e.g. trailerUrl, title, price, etc.) in custom_media_list
+app.post("/api/custom-media/update", async (req, res) => {
+  try {
+    const { id, trailerUrl, title, price, duration, description } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: "Missing video ID" });
+    }
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      const { data: existingData } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "custom_media_list")
+        .maybeSingle();
+
+      let currentList = existingData && Array.isArray(existingData.value) ? existingData.value : [];
+      let updated = false;
+
+      currentList = currentList.map((item: any) => {
+        if (item.id === id) {
+          updated = true;
+          return {
+            ...item,
+            ...(trailerUrl !== undefined ? { trailerUrl: String(trailerUrl).trim() || null } : {}),
+            ...(title ? { title: title.trim(), titleEn: title.trim() } : {}),
+            ...(price ? { price: parseFloat(price) || item.price } : {}),
+            ...(duration ? { duration: duration.trim() } : {}),
+            ...(description ? { description: description.trim(), descriptionEn: description.trim() } : {})
+          };
+        }
+        return item;
+      });
+
+      if (updated) {
+        await supabase.from("site_settings").upsert({
+          key: "custom_media_list",
+          value: currentList,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+
+    // Also update in-memory cache
+    const memItem = customUploadedMedia.find((m) => m.id === id);
+    if (memItem) {
+      if (trailerUrl !== undefined) memItem.trailerUrl = String(trailerUrl).trim() || null;
+      if (title) { memItem.title = title.trim(); memItem.titleEn = title.trim(); }
+      if (price) memItem.price = parseFloat(price) || memItem.price;
+      if (duration) memItem.duration = duration.trim();
+      if (description) { memItem.description = description.trim(); memItem.descriptionEn = description.trim(); }
+    }
+
+    return res.json({ success: true, message: "Video updated successfully" });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

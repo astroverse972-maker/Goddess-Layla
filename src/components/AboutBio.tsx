@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, ChevronLeft, ChevronRight, Gift, Send, Crown, CreditCard } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { getSupabaseClient } from '../lib/supabaseClient';
 
 interface AboutBioProps {
   lang?: 'fr' | 'en';
@@ -9,10 +10,76 @@ interface AboutBioProps {
 export const AboutBio: React.FC<AboutBioProps> = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
+  const [supabasePhotos, setSupabasePhotos] = useState<string[]>([]);
 
-  const gallerySlides = Array.isArray(siteSettings.about_photos) && siteSettings.about_photos.length > 0
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLuziaPhotos() {
+      // 1. Try server endpoint first
+      try {
+        const res = await fetch('/api/luzia-photos');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.photos) && data.photos.length > 0 && isMounted) {
+            setSupabasePhotos(data.photos);
+            return;
+          }
+        }
+      } catch (e) {
+        // Fall back to client-side storage query
+      }
+
+      // 2. Direct client-side Supabase Storage lookup
+      try {
+        const sb = getSupabaseClient();
+        if (!sb) return;
+
+        for (const bucket of ['luzia', 'Luzia']) {
+          for (const folder of ['Luzia Pic', 'luzia pic']) {
+            const { data, error } = await sb.storage.from(bucket).list(folder, {
+              limit: 100,
+              sortBy: { column: 'name', order: 'asc' }
+            });
+
+            if (!error && Array.isArray(data) && data.length > 0) {
+              const imageFiles = data.filter(
+                (f) => f.name && !f.name.startsWith('.') && !f.name.endsWith('/')
+              );
+
+              if (imageFiles.length > 0) {
+                const urls = imageFiles.map((f) => {
+                  const { data: pubData } = sb.storage
+                    .from(bucket)
+                    .getPublicUrl(`${folder}/${f.name}`);
+                  return pubData.publicUrl;
+                });
+
+                if (isMounted && urls.length > 0) {
+                  setSupabasePhotos(urls);
+                  return;
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load photos from Supabase Storage luzia/Luzia Pic:', err);
+      }
+    }
+
+    loadLuziaPhotos();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const fallbackSlides = Array.isArray(siteSettings.about_photos) && siteSettings.about_photos.length > 0
     ? siteSettings.about_photos.filter(Boolean)
     : (Array.isArray(creatorProfile.gallery) ? creatorProfile.gallery.filter(Boolean) : []);
+
+  const gallerySlides = supabasePhotos.length > 0 ? supabasePhotos : fallbackSlides;
 
   const nextSlide = () => {
     if (gallerySlides.length > 0) {

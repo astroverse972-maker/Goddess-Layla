@@ -14,6 +14,8 @@ export interface CollectionItem {
   tags: string[];
   videoStoragePath?: string;
   video_storage_path?: string;
+  trailerUrl?: string;
+  trailer_url?: string;
 }
 
 export const AVATAR_IMG = '';

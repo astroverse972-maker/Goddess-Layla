@@ -19,6 +19,12 @@ const VideoCard: React.FC<{
   const [isHovered, setIsHovered] = useState(false);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const touchStartedRef = useRef(false);
+
+  const trailer = (item.trailerUrl || item.trailer_url || '').trim();
+  const hasTrailer = Boolean(trailer);
+  const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
 
   // Frames array for the static JPG slideshow:
   // Prefer explicit previewImages array; fallback to thumbnail and variations
@@ -27,7 +33,7 @@ const VideoCard: React.FC<{
     : [item.thumbnailUrl];
 
   useEffect(() => {
-    if (isHovered && frames.length > 1) {
+    if (isHovered && !isPlayingTrailer && frames.length > 1) {
       // Cycle through static JPG preview frames every 750ms
       timerRef.current = setInterval(() => {
         setCurrentFrameIndex((prev) => (prev + 1) % frames.length);
@@ -46,27 +52,67 @@ const VideoCard: React.FC<{
         timerRef.current = null;
       }
     };
-  }, [isHovered, frames.length]);
+  }, [isHovered, isPlayingTrailer, frames.length]);
+
+  useEffect(() => {
+    if (isPlayingTrailer && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [isPlayingTrailer]);
 
   const activeImage = frames[currentFrameIndex] || item.thumbnailUrl;
 
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (hasTrailer) {
+      setIsPlayingTrailer(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (hasTrailer) {
+      setIsPlayingTrailer(false);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If touch device and has trailer and trailer is not playing yet:
+    // First tap shows preview; second tap opens modal
+    if (hasTrailer && !isPlayingTrailer && touchStartedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsPlayingTrailer(true);
+      return;
+    }
+    onSelectItem(item);
+  };
+
   return (
     <div
-      onClick={() => onSelectItem(item)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onTouchStart={() => setIsHovered(true)}
-      onTouchEnd={() => {
-        // Allow brief display before opening on tap
-        setTimeout(() => setIsHovered(false), 1500);
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={() => {
+        touchStartedRef.current = true;
       }}
       className="group bg-white border border-gray-200/80 rounded-2xl sm:rounded-3xl shadow-xs overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 flex flex-col justify-between select-none"
     >
-      {/* Media Static JPG Thumbnail & Slideshow Container (STRICTLY STATIC JPG IMAGES, NO LIVE VIDEO) */}
+      {/* Media Container: Trailer Video (when hovering/tap) or Static JPG Thumbnail */}
       <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-neutral-900 rounded-t-2xl sm:rounded-t-3xl">
-        
-        {/* Active Static JPG Image or Fallback */}
-        {activeImage ? (
+        {/* Active Trailer Video or Static JPG Image */}
+        {hasTrailer && isPlayingTrailer ? (
+          <video
+            ref={videoRef}
+            src={trailer}
+            muted
+            loop
+            playsInline
+            autoPlay
+            preload="auto"
+            className="w-full h-full object-cover"
+          />
+        ) : activeImage ? (
           <img
             key={activeImage}
             src={activeImage}
@@ -83,8 +129,8 @@ const VideoCard: React.FC<{
           </div>
         )}
 
-        {/* Frame Progress Indicator Bars (Shows when hovering / cycling through static JPG frames) */}
-        {frames.length > 1 && (
+        {/* Frame Progress Indicator Bars (Shows when hovering / cycling through static JPG frames and no trailer is playing) */}
+        {!isPlayingTrailer && frames.length > 1 && (
           <div className="absolute top-0 left-0 right-0 p-2 flex gap-1 z-20 transition-opacity duration-300">
             {frames.map((_, idx) => (
               <div
@@ -105,13 +151,18 @@ const VideoCard: React.FC<{
           <span>Locked Preview</span>
         </div>
 
-        {/* Slideshow Active Badge (Top Right when hovering) */}
-        {isHovered && frames.length > 1 && (
+        {/* Trailer Playing Badge or Slideshow Frame Badge */}
+        {hasTrailer && isPlayingTrailer ? (
+          <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 border border-white/20 animate-fade-in z-10">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Trailer</span>
+          </div>
+        ) : isHovered && frames.length > 1 ? (
           <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 border border-white/20 animate-fade-in z-10">
             <ImageIcon className="w-3 h-3 text-white" />
             <span>Frame {currentFrameIndex + 1}/{frames.length}</span>
           </div>
-        )}
+        ) : null}
 
         {/* Duration Badge Bottom Right */}
         <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-md text-white text-xs font-bold tracking-wide z-10">
@@ -119,12 +170,21 @@ const VideoCard: React.FC<{
         </div>
 
         {/* Bottom Hover Hint */}
-        <div className={`absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-md text-gray-300 text-[10px] font-medium tracking-wide flex items-center gap-1 transition-opacity duration-300 z-10 ${
-          isHovered ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'
-        }`}>
-          <Sparkles className="w-3 h-3 text-white" />
-          <span>Static preview slideshow</span>
-        </div>
+        {hasTrailer ? (
+          <div className={`absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-md text-gray-300 text-[10px] font-medium tracking-wide flex items-center gap-1 transition-opacity duration-300 z-10 ${
+            isPlayingTrailer || isHovered ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'
+          }`}>
+            <Sparkles className="w-3 h-3 text-white" />
+            <span>{isPlayingTrailer ? 'Playing trailer preview' : 'Hover to preview trailer'}</span>
+          </div>
+        ) : (
+          <div className={`absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-md text-gray-300 text-[10px] font-medium tracking-wide flex items-center gap-1 transition-opacity duration-300 z-10 ${
+            isHovered ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'
+          }`}>
+            <Sparkles className="w-3 h-3 text-white" />
+            <span>Static preview slideshow</span>
+          </div>
+        )}
       </div>
 
       {/* Text Info Below Thumbnail */}
@@ -142,7 +202,7 @@ const VideoCard: React.FC<{
         <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
           <span className="text-gray-500 font-medium text-xs flex items-center gap-1">
             <ImageIcon className="w-3.5 h-3.5 text-gray-400" />
-            <span>Preview slideshow active</span>
+            <span>{hasTrailer ? 'Trailer preview available' : 'Preview slideshow active'}</span>
           </span>
 
           <div className="flex items-center gap-1.5 font-extrabold text-black bg-gray-100 px-3 py-1 rounded-full border border-gray-200">

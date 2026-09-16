@@ -136,6 +136,10 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [videoDescription, setVideoDescription] = useState('Exclusive encrypted video archive. Delivered immediately upon authorized transaction.');
   const [driveUrl, setDriveUrl] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [trailerUrl, setTrailerUrl] = useState('');
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [editingTrailerUrl, setEditingTrailerUrl] = useState('');
+  const [isSavingTrailer, setIsSavingTrailer] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadTerminalLogs, setUploadTerminalLogs] = useState<string[]>([]);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -564,6 +568,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           previewUrl: driveUrl.trim(),
           videoUrl: driveUrl.trim(),
           googleDriveLink: driveUrl.trim(),
+          trailerUrl: trailerUrl.trim(),
           thumbnailUrl: thumbnailUrl.trim() || avatarInput || (galleryInputs[0] || ''),
           duration: videoDuration.trim() || '18:45',
           description: cleanDesc,
@@ -584,6 +589,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
           setVideoTitle('');
           setDriveUrl('');
           setThumbnailUrl('');
+          setTrailerUrl('');
         } else {
           setUploadTerminalLogs(prev => [
             ...prev,
@@ -603,6 +609,28 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         setUploadSuccess(true);
         setIsUploading(false);
       }, 900);
+    }
+  };
+
+  // Update Trailer URL on an existing published video
+  const handleSaveExistingTrailer = async (videoId: string) => {
+    setIsSavingTrailer(true);
+    try {
+      await fetch('/api/custom-media/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: videoId,
+          trailerUrl: editingTrailerUrl.trim()
+        })
+      });
+      setEditingVideoId(null);
+      setEditingTrailerUrl('');
+      onUploadMediaSuccess();
+    } catch (err) {
+      console.warn('Failed to update trailer URL:', err);
+    } finally {
+      setIsSavingTrailer(false);
     }
   };
 
@@ -1232,6 +1260,21 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       />
                     </div>
 
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-mono font-bold uppercase text-white flex items-center justify-between">
+                        <span>{lang === 'nl' ? 'Trailer URL (optioneel)' : 'Trailer URL (optional)'}</span>
+                        <span className="text-[9px] text-neutral-400 font-mono">SUPABASE STORAGE</span>
+                      </label>
+                      <input
+                        id="video-trailer-url-input"
+                        type="text"
+                        value={trailerUrl}
+                        onChange={(e) => setTrailerUrl(e.target.value)}
+                        placeholder="https://...supabase.co/storage/v1/object/public/luzia/Luzia%20Vid/trailer.mp4"
+                        className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder:text-neutral-500 focus:outline-none"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono uppercase text-neutral-300">
@@ -1368,6 +1411,61 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                               <Trash2 className="w-3 h-3" />
                               <span>{lang === 'nl' ? 'Verwijder' : 'Delete'}</span>
                             </button>
+                          </div>
+
+                          {/* Trailer URL status / editor */}
+                          <div className="pt-2 border-t border-white/5 space-y-1.5">
+                            {editingVideoId === video.id ? (
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-neutral-300 font-mono">
+                                  {lang === 'nl' ? 'Trailer URL (optioneel):' : 'Trailer URL (optional):'}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editingTrailerUrl}
+                                  onChange={(e) => setEditingTrailerUrl(e.target.value)}
+                                  placeholder="https://...supabase.co/.../trailer.mp4"
+                                  className="w-full bg-black/50 border border-white/20 rounded-lg px-2.5 py-1.5 text-[11px] text-white focus:outline-none"
+                                />
+                                <div className="flex items-center gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingVideoId(null)}
+                                    className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-neutral-300 text-[10px] cursor-pointer"
+                                  >
+                                    {lang === 'nl' ? 'Annuleren' : 'Cancel'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isSavingTrailer}
+                                    onClick={() => handleSaveExistingTrailer(video.id)}
+                                    className="px-2.5 py-1 rounded bg-white hover:bg-neutral-200 text-black font-bold text-[10px] cursor-pointer"
+                                  >
+                                    {isSavingTrailer ? '...' : (lang === 'nl' ? 'Opslaan' : 'Save')}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                                <span className="truncate max-w-[170px]">
+                                  {video.trailerUrl ? (
+                                    <span className="text-emerald-400 font-semibold">✓ Trailer linked</span>
+                                  ) : (
+                                    <span className="text-neutral-500">No trailer URL</span>
+                                  )}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingVideoId(video.id);
+                                    setEditingTrailerUrl(video.trailerUrl || '');
+                                  }}
+                                  className="text-neutral-300 hover:text-white underline cursor-pointer text-[10px]"
+                                >
+                                  {video.trailerUrl ? (lang === 'nl' ? 'Wijzigen' : 'Edit') : (lang === 'nl' ? '+ Trailer toevoegen' : '+ Add Trailer')}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
