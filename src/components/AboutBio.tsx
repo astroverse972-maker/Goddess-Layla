@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, ChevronLeft, ChevronRight, Gift, Send, Crown, CreditCard } from 'lucide-react';
+import { ExternalLink, Gift, Send, Crown, CreditCard } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
 
@@ -7,8 +7,34 @@ interface AboutBioProps {
   lang?: 'fr' | 'en';
 }
 
+const isValidAboutPhoto = (url: string) => {
+  if (!url || typeof url !== 'string') return false;
+  // Explicitly exclude the profile avatar portrait from the about gallery
+  if (url.includes('ifABElLS_400x400.jpg')) return false;
+
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  const videoExts = [
+    '.mp4',
+    '.mov',
+    '.webm',
+    '.m4v',
+    '.avi',
+    '.mkv',
+    '.wmv',
+    '.flv',
+    '.3gp',
+    '.quicktime'
+  ];
+  if (videoExts.some((ext) => cleanUrl.endsWith(ext))) return false;
+  const nonMediaExts = ['.pdf', '.zip', '.tar', '.gz', '.json', '.txt', '.doc', '.docx'];
+  if (nonMediaExts.some((ext) => cleanUrl.endsWith(ext))) return false;
+  return true;
+};
+
 export const AboutBio: React.FC<AboutBioProps> = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [prevSlide, setPrevSlide] = useState<number | null>(null);
+  const [isCrossfading, setIsCrossfading] = useState(false);
   const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
   const [supabasePhotos, setSupabasePhotos] = useState<string[]>([]);
 
@@ -16,14 +42,17 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
     let isMounted = true;
 
     async function loadLuziaPhotos() {
-      // 1. Try server endpoint first
+      // 1. Try server endpoint first (pulls from Luzia/Luzia Pic)
       try {
         const res = await fetch('/api/luzia-photos');
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.photos) && data.photos.length > 0 && isMounted) {
-            setSupabasePhotos(data.photos);
-            return;
+            const valid = data.photos.filter(isValidAboutPhoto);
+            if (valid.length > 0) {
+              setSupabasePhotos(valid);
+              return;
+            }
           }
         }
       } catch (e) {
@@ -35,8 +64,8 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
         const sb = getSupabaseClient();
         if (!sb) return;
 
-        for (const bucket of ['luzia', 'Luzia']) {
-          for (const folder of ['Luzia Pic', 'luzia pic']) {
+        for (const bucket of ['Luzia', 'luzia']) {
+          for (const folder of ['Luzia Pic', 'luzia pic', 'Luzia%20Pic']) {
             const { data, error } = await sb.storage.from(bucket).list(folder, {
               limit: 100,
               sortBy: { column: 'name', order: 'asc' }
@@ -44,7 +73,11 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
 
             if (!error && Array.isArray(data) && data.length > 0) {
               const imageFiles = data.filter(
-                (f) => f.name && !f.name.startsWith('.') && !f.name.endsWith('/')
+                (f) =>
+                  f.name &&
+                  !f.name.startsWith('.') &&
+                  !f.name.endsWith('/') &&
+                  isValidAboutPhoto(f.name)
               );
 
               if (imageFiles.length > 0) {
@@ -56,7 +89,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
                 });
 
                 if (isMounted && urls.length > 0) {
-                  setSupabasePhotos(urls);
+                  setSupabasePhotos(urls.filter(isValidAboutPhoto));
                   return;
                 }
               }
@@ -64,7 +97,7 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
           }
         }
       } catch (err) {
-        console.warn('Could not load photos from Supabase Storage luzia/Luzia Pic:', err);
+        console.warn('Could not load photos from Supabase Storage Luzia/Luzia Pic:', err);
       }
     }
 
@@ -79,30 +112,53 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
     ? siteSettings.about_photos.filter(Boolean)
     : (Array.isArray(creatorProfile.gallery) ? creatorProfile.gallery.filter(Boolean) : []);
 
-  const gallerySlides = supabasePhotos.length > 0 ? supabasePhotos : fallbackSlides;
+  const rawGallerySlides = supabasePhotos.length > 0 ? supabasePhotos : fallbackSlides;
+  const gallerySlides = rawGallerySlides.filter(isValidAboutPhoto);
 
-  const nextSlide = () => {
-    if (gallerySlides.length > 0) {
-      setCurrentSlide((prev) => (prev + 1) % gallerySlides.length);
-    }
-  };
+  // Preload all gallery images in browser cache so crossfades are seamless without pop-in
+  useEffect(() => {
+    gallerySlides.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [gallerySlides]);
 
-  const prevSlide = () => {
-    if (gallerySlides.length > 0) {
-      setCurrentSlide((prev) => (prev - 1 + gallerySlides.length) % gallerySlides.length);
-    }
-  };
-
+  // Auto-advance every 5.5 seconds with seamless looping
   useEffect(() => {
     if (gallerySlides.length <= 1) return;
-    const timer = setInterval(() => {
-      nextSlide();
-    }, 4500);
-    return () => clearInterval(timer);
+
+    const interval = setInterval(() => {
+      setCurrentSlide((curr) => {
+        const next = (curr + 1) % gallerySlides.length;
+        setPrevSlide(curr);
+        setIsCrossfading(false);
+        return next;
+      });
+    }, 5500);
+
+    return () => clearInterval(interval);
   }, [gallerySlides.length]);
 
+  // Handle smooth 1.4s crossfade
+  useEffect(() => {
+    if (prevSlide !== null) {
+      const animFrame = requestAnimationFrame(() => {
+        setIsCrossfading(true);
+      });
+      const timer = setTimeout(() => {
+        setPrevSlide(null);
+        setIsCrossfading(false);
+      }, 1400);
+
+      return () => {
+        cancelAnimationFrame(animFrame);
+        clearTimeout(timer);
+      };
+    }
+  }, [prevSlide, currentSlide]);
+
   const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
-  const bioText = siteSettings.about_text || creatorProfile.bio || 'Welkom op de officiële website van Goddess Luzia. Bekijk video\'s, teasers en bestel content veilig via Throne of TipFunder.';
+  const bioText = siteSettings.about_text || creatorProfile.bio || 'Welkom op de officiële website van Goddess Luzia. Bekijk video\'s en bestel content veilig via Throne of TipFunder.';
   const throneLink = siteSettings.throne_link || paymentSettings.throne;
   const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;
   const xLink = siteSettings.twitter_link || paymentSettings.x;
@@ -222,64 +278,40 @@ export const AboutBio: React.FC<AboutBioProps> = () => {
 
         </div>
 
-        {/* Right Column: Interactive Gallery */}
-        <div className="w-full">
+        {/* Right Column: Natural Resolution Photo Slideshow (No container background, no blur, no letterbox) */}
+        <div className="w-full flex items-center justify-center">
           {gallerySlides.length > 0 ? (
-            <div className="relative aspect-[4/5] sm:aspect-[3/4] w-full rounded-3xl overflow-hidden border border-gray-200 shadow-md group bg-neutral-900">
+            <div className="relative inline-flex items-center justify-center select-none">
+              {/* Current foreground photo in document flow: sizes container to match each photo exactly */}
               <img
+                key={gallerySlides[currentSlide]}
                 src={gallerySlides[currentSlide]}
                 alt={`${creatorName} Portrait`}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                loading="eager"
+                className={`max-h-[70vh] sm:max-h-[580px] lg:max-h-[640px] max-w-full w-auto h-auto object-contain rounded-2xl block transition-opacity duration-[1400ms] ease-in-out ${
+                  isCrossfading || prevSlide === null ? 'opacity-100' : 'opacity-0'
+                }`}
               />
 
-              {/* Slide Navigation Buttons */}
-              {gallerySlides.length > 1 && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      prevSlide();
-                    }}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md transition-all cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nextSlide();
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md transition-all cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md">
-                    {gallerySlides.map((_, idx) => (
-                      <span
-                        key={idx}
-                        className={`w-1.5 h-1.5 rounded-full transition-all ${
-                          idx === currentSlide ? 'bg-white w-3' : 'bg-white/50'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
+              {/* Outgoing photo dissolving away gently */}
+              {prevSlide !== null && gallerySlides[prevSlide] && (
+                <img
+                  key={gallerySlides[prevSlide]}
+                  src={gallerySlides[prevSlide]}
+                  alt=""
+                  aria-hidden="true"
+                  referrerPolicy="no-referrer"
+                  className={`absolute inset-0 m-auto max-h-full max-w-full w-auto h-auto object-contain rounded-2xl pointer-events-none transition-opacity duration-[1400ms] ease-in-out ${
+                    isCrossfading ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
               )}
             </div>
           ) : (
-            <div className="aspect-[4/5] sm:aspect-[3/4] w-full rounded-3xl bg-neutral-950 border border-neutral-800 p-8 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-20 h-20 rounded-full bg-neutral-900 border border-white/20 flex items-center justify-center text-white">
-                <Crown className="w-10 h-10" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold font-serif text-white">
-                  {creatorName}
-                </h3>
-                <p className="text-xs text-neutral-400 font-mono uppercase tracking-widest">
-                  Official Website
-                </p>
+            <div className="w-full flex items-center justify-center p-8">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-black">
+                <Crown className="w-8 h-8" />
               </div>
             </div>
           )}

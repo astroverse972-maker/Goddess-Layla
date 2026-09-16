@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { extractGoogleDriveId } from '../utils/sanitizeMedia';
 
 export const DEFAULT_BANNER_WORDS: string[] = [
@@ -8,31 +10,38 @@ export const DEFAULT_BANNER_WORDS: string[] = [
   "See What's New"
 ];
 
-interface VideoWallpaperItem {
+export interface PromoClipItem {
   id: string;
+  title: string;
   videoUrl?: string;
   thumbnailUrl?: string;
   googleDriveId?: string | null;
+  textOverlay?: string;
+  announcementBadge?: string;
 }
 
-const FALLBACK_WALLPAPERS: VideoWallpaperItem[] = [
+const FALLBACK_CLIPS: PromoClipItem[] = [
   {
     id: 'fb-1',
+    title: '',
     videoUrl: 'https://i.imgur.com/m0CSW44.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=1200&auto=format&fit=crop'
   },
   {
     id: 'fb-2',
+    title: '',
     videoUrl: 'https://i.imgur.com/gK9qN2p.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200&auto=format&fit=crop'
   },
   {
     id: 'fb-3',
+    title: '',
     videoUrl: 'https://i.imgur.com/m0CSW44.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1200&auto=format&fit=crop'
   },
   {
     id: 'fb-4',
+    title: '',
     videoUrl: 'https://i.imgur.com/gK9qN2p.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?q=80&w=1200&auto=format&fit=crop'
   }
@@ -44,132 +53,144 @@ interface PromoBannerProps {
   lang?: 'fr' | 'en';
 }
 
-export const PromoBanner: React.FC<PromoBannerProps> = ({
-  onOpenShop,
-  words = DEFAULT_BANNER_WORDS
-}) => {
-  const [wallpaperVideos, setWallpaperVideos] = useState<VideoWallpaperItem[]>(FALLBACK_WALLPAPERS);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(0);
-  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
-  const [isWordFading, setIsWordFading] = useState<boolean>(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+export const PromoBanner: React.FC<PromoBannerProps> = ({ onOpenShop, lang }) => {
+  const [clips, setClips] = useState<PromoClipItem[]>(FALLBACK_CLIPS);
+  const [currentIdx, setCurrentIdx] = useState<number>(0);
+  const [prevIdx, setPrevIdx] = useState<number | null>(null);
+  const [isCrossfading, setIsCrossfading] = useState<boolean>(false);
+  const [rotationIntervalSec, setRotationIntervalSec] = useState<number>(6);
+  const [globalAnnouncement, setGlobalAnnouncement] = useState<string>('');
+  const primaryVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Fetch up to 4 most recent video previews from custom-media and promo-banner endpoints
+  // Fetch rotating promotional clips and configuration from server
   useEffect(() => {
     let isMounted = true;
 
-    async function loadRecentVideoPreviews() {
+    async function loadPromoData() {
       try {
-        const foundVideos: VideoWallpaperItem[] = [];
+        const foundClips: PromoClipItem[] = [];
 
-        // 1. Fetch from custom-media (latest creator uploads)
-        const customRes = await fetch('/api/custom-media');
-        if (customRes.ok) {
-          const customData = await customRes.json();
-          const items = Array.isArray(customData)
-            ? customData
-            : customData && Array.isArray(customData.media)
-            ? customData.media
-            : [];
-
-          for (const item of items) {
-            const rawUrl = item.previewUrl || item.videoStoragePath || '';
-            const gDrive = extractGoogleDriveId(rawUrl || item.googleDriveLink);
-            if (rawUrl || gDrive || item.thumbnailUrl) {
-              foundVideos.push({
-                id: item.id || `custom-${foundVideos.length}`,
-                videoUrl: !gDrive && rawUrl ? rawUrl : undefined,
-                thumbnailUrl: item.thumbnailUrl,
-                googleDriveId: gDrive
-              });
+        // 1. Fetch promotional clips & configuration from /api/promo-banner
+        const promoRes = await fetch('/api/promo-banner');
+        if (promoRes.ok) {
+          const promoData = await promoRes.json();
+          if (promoData) {
+            if (typeof promoData.rotation_interval_sec === 'number' && promoData.rotation_interval_sec >= 3) {
+              setRotationIntervalSec(promoData.rotation_interval_sec);
             }
-            if (foundVideos.length >= 4) break;
-          }
-        }
-
-        // 2. Supplement from promo-banner if fewer than 4 videos found
-        if (foundVideos.length < 4) {
-          const promoRes = await fetch('/api/promo-banner');
-          if (promoRes.ok) {
-            const promoData = await promoRes.json();
-            if (promoData && Array.isArray(promoData.clips)) {
+            if (promoData.global_text_overlay) {
+              setGlobalAnnouncement(promoData.global_text_overlay);
+            }
+            if (Array.isArray(promoData.clips)) {
               for (const clip of promoData.clips) {
                 if (clip.is_active === false) continue;
                 const gDrive = extractGoogleDriveId(clip.google_drive_link || clip.video_url);
-                foundVideos.push({
-                  id: clip.id || `promo-${foundVideos.length}`,
+                foundClips.push({
+                  id: clip.id || `promo-${foundClips.length}`,
+                  title: typeof clip.title === 'string' ? clip.title.trim() : '',
                   videoUrl: !gDrive && clip.video_url ? clip.video_url : undefined,
                   thumbnailUrl: clip.thumbnail_url,
-                  googleDriveId: gDrive
+                  googleDriveId: gDrive,
+                  textOverlay: clip.text_overlay || '',
+                  announcementBadge: clip.announcement_badge || ''
                 });
-                if (foundVideos.length >= 4) break;
               }
             }
           }
         }
 
-        // 3. Fallback fill to always ensure exactly 4 video panels
-        if (foundVideos.length < 4) {
-          for (let i = foundVideos.length; i < 4; i++) {
-            foundVideos.push(FALLBACK_WALLPAPERS[i % FALLBACK_WALLPAPERS.length]);
+        // 2. Supplement from custom-media if fewer than 4 clips
+        if (foundClips.length < 4) {
+          const customRes = await fetch('/api/custom-media');
+          if (customRes.ok) {
+            const customData = await customRes.json();
+            const items = Array.isArray(customData)
+              ? customData
+              : customData && Array.isArray(customData.media)
+              ? customData.media
+              : [];
+
+            for (const item of items) {
+              const rawUrl = item.previewUrl || item.videoStoragePath || '';
+              const gDrive = extractGoogleDriveId(rawUrl || item.googleDriveLink);
+              if (rawUrl || gDrive || item.thumbnailUrl) {
+                foundClips.push({
+                  id: item.id || `custom-${foundClips.length}`,
+                  title: typeof item.title === 'string' ? item.title.trim() : '',
+                  videoUrl: !gDrive && rawUrl ? rawUrl : undefined,
+                  thumbnailUrl: item.thumbnailUrl,
+                  googleDriveId: gDrive,
+                  textOverlay: '',
+                  announcementBadge: ''
+                });
+              }
+              if (foundClips.length >= 4) break;
+            }
           }
         }
 
-        if (isMounted && foundVideos.length >= 4) {
-          setWallpaperVideos(foundVideos.slice(0, 4));
+        // 3. Fallback fill to guarantee at least 4 items
+        if (foundClips.length < 4) {
+          for (let i = foundClips.length; i < 4; i++) {
+            foundClips.push(FALLBACK_CLIPS[i % FALLBACK_CLIPS.length]);
+          }
+        }
+
+        if (isMounted && foundClips.length > 0) {
+          setClips(foundClips);
         }
       } catch (err) {
-        // Retain fallback wallpapers on network error
+        // Retain fallback clips on network error
       }
     }
 
-    loadRecentVideoPreviews();
+    loadPromoData();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Sequential full-bleed video progression: advance to next video
-  const advanceToNextVideo = () => {
-    setCurrentVideoIndex((prev) => (prev + 1) % wallpaperVideos.length);
-  };
+  // Advance to the next promotional clip with a gentle crossfade
+  const advanceToNextClip = useCallback(() => {
+    if (clips.length <= 1) return;
+    setCurrentIdx((curr) => {
+      setPrevIdx(curr);
+      setIsCrossfading(false);
+      return (curr + 1) % clips.length;
+    });
+  }, [clips.length]);
 
-  // Fallback timer: advances video every 8s if onEnded does not trigger (e.g. iframe, image, or stalled video)
+  // Handle crossfade completion after ~1.3 seconds
   useEffect(() => {
+    if (prevIdx !== null) {
+      const raf = requestAnimationFrame(() => {
+        setIsCrossfading(true);
+      });
+      const timer = setTimeout(() => {
+        setPrevIdx(null);
+        setIsCrossfading(false);
+      }, 1350);
+
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(timer);
+      };
+    }
+  }, [prevIdx]);
+
+  // Silent automatic rotation timer (no visible bars, dots, or countdowns)
+  useEffect(() => {
+    if (clips.length <= 1) return;
+    const intervalMs = Math.max(4000, rotationIntervalSec * 1000);
     const timer = setInterval(() => {
-      advanceToNextVideo();
-    }, 8000);
+      advanceToNextClip();
+    }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [wallpaperVideos.length]);
+  }, [clips.length, rotationIntervalSec, advanceToNextClip]);
 
-  // Play current video whenever currentVideoIndex updates
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [currentVideoIndex]);
-
-  // Single button label rotating cycle
-  const wordList = words && words.length > 0 ? words : DEFAULT_BANNER_WORDS;
-
-  useEffect(() => {
-    if (wordList.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setIsWordFading(true);
-      setTimeout(() => {
-        setCurrentWordIndex((prev) => (prev + 1) % wordList.length);
-        setIsWordFading(false);
-      }, 300);
-    }, 3200);
-
-    return () => clearInterval(interval);
-  }, [wordList.length]);
-
-  // Universal navigation action: clicking the button scrolls to the latest videos section
+  // Action handler: scrolls to collection or triggers onOpenShop
   const handleNavigateToVideos = () => {
     if (onOpenShop) {
       onOpenShop();
@@ -181,86 +202,143 @@ export const PromoBanner: React.FC<PromoBannerProps> = ({
     }
   };
 
-  const currentVideo = wallpaperVideos[currentVideoIndex % wallpaperVideos.length] || FALLBACK_WALLPAPERS[0];
-  const activeLabel = wordList[currentWordIndex % wordList.length] || wordList[0];
+  const currentClip = clips[currentIdx] || FALLBACK_CLIPS[0];
+  const outgoingClip = prevIdx !== null ? clips[prevIdx] : null;
+  const currentTitle = typeof currentClip?.title === 'string' ? currentClip.title.trim() : '';
+
+  // Quiet announcement beneath banner: only shows global announcement if set
+  const activeAnnouncement = globalAnnouncement || '';
+
+  const renderMedia = (clip: PromoClipItem, isPrimary: boolean) => {
+    if (clip.googleDriveId) {
+      return (
+        <iframe
+          key={clip.id}
+          src={`https://drive.google.com/file/d/${clip.googleDriveId}/preview`}
+          title={clip.title}
+          allow="autoplay; fullscreen"
+          className="w-full h-full border-0 pointer-events-none scale-105 object-cover"
+        />
+      );
+    }
+    if (clip.videoUrl) {
+      return (
+        <video
+          ref={isPrimary ? primaryVideoRef : undefined}
+          key={clip.id}
+          src={clip.videoUrl}
+          poster={clip.thumbnailUrl}
+          autoPlay
+          muted
+          playsInline
+          loop
+          preload="auto"
+          onEnded={advanceToNextClip}
+          className="w-full h-full object-cover pointer-events-none"
+        />
+      );
+    }
+    if (clip.thumbnailUrl) {
+      return (
+        <img
+          key={clip.id}
+          src={clip.thumbnailUrl}
+          alt={clip.title}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover pointer-events-none"
+        />
+      );
+    }
+    return <div className="w-full h-full bg-neutral-950" />;
+  };
 
   return (
-    <div
-      id="promo-wallpaper-banner"
-      className="relative w-full h-[260px] sm:h-[320px] md:h-[360px] rounded-3xl overflow-hidden border border-neutral-800/80 bg-neutral-950 shadow-2xl select-none"
-    >
-      {/* 1. Full-bleed Sequential Video Wallpaper: 1 video at a time, looping to next video upon finish */}
-      <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-none">
-        {currentVideo.googleDriveId ? (
-          <iframe
-            key={currentVideo.id}
-            src={`https://drive.google.com/file/d/${currentVideo.googleDriveId}/preview`}
-            title="Video preview"
-            allow="autoplay; fullscreen"
-            className="w-full h-full border-0 pointer-events-none scale-110 object-cover opacity-85"
-          />
-        ) : currentVideo.videoUrl ? (
-          <video
-            ref={videoRef}
-            key={currentVideo.id}
-            src={currentVideo.videoUrl}
-            poster={currentVideo.thumbnailUrl}
-            autoPlay
-            muted
-            playsInline
-            preload="auto"
-            onEnded={advanceToNextVideo}
-            className="w-full h-full object-cover pointer-events-none opacity-85 transition-opacity duration-700"
-          />
-        ) : currentVideo.thumbnailUrl ? (
-          <img
-            key={currentVideo.id}
-            src={currentVideo.thumbnailUrl}
-            alt="Video preview thumbnail"
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover pointer-events-none opacity-85 transition-opacity duration-700"
-          />
-        ) : (
-          <div className="w-full h-full bg-neutral-950" />
+    <div id="promo-wallpaper-banner" className="w-full select-none font-sans">
+      {/* 1. Cinematic Banner Canvas (No buttons, no badges, no progress bar, no glassmorphism) */}
+      <div
+        onClick={handleNavigateToVideos}
+        className="group relative w-full h-[280px] sm:h-[360px] md:h-[420px] lg:h-[460px] rounded-3xl overflow-hidden bg-neutral-950 cursor-pointer shadow-sm transition-all duration-300"
+      >
+        {/* Layer A: Active Incoming Clip */}
+        <div
+          className={`absolute inset-0 w-full h-full transition-opacity duration-[1300ms] ease-in-out ${
+            prevIdx === null || isCrossfading ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {renderMedia(currentClip, true)}
+        </div>
+
+        {/* Layer B: Outgoing Clip (smoothly dissolves away) */}
+        {outgoingClip && (
+          <div
+            className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-[1300ms] ease-in-out ${
+              isCrossfading ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            {renderMedia(outgoingClip, false)}
+          </div>
         )}
+
+        {/* Subtle, soft cinematic vignette in the lower third for effortless typographic contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/5 pointer-events-none" />
+
+        {/* Lower Third Typography: Elegant, refined title with calm reveal and exit animations */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 lg:p-10 pointer-events-none z-10">
+          <div className="max-w-3xl min-h-[2.5rem] sm:min-h-[3.25rem] flex items-end">
+            <AnimatePresence mode="wait">
+              {currentTitle ? (
+                <motion.h2
+                  key={currentClip.id || `promo-clip-${currentIdx}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      duration: 0.75,
+                      ease: [0.25, 0.1, 0.25, 1]
+                    }
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -6,
+                    transition: {
+                      duration: 0.55,
+                      ease: [0.25, 0.1, 0.25, 1]
+                    }
+                  }}
+                  className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light tracking-[0.08em] sm:tracking-[0.1em] text-white/95 leading-tight select-none drop-shadow-sm"
+                >
+                  {currentTitle}
+                </motion.h2>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Dark Overlay: 60% black for a moodier background and enhanced contrast */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.60)' }}
-      />
+      {/* 2. Space Beneath the Banner: Minimal, elegant "Watch the Latest" text link & quiet announcement */}
+      <div className="pt-3.5 pb-1 px-1 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+        {/* Quiet, refined announcement text (plain text, no colored badge or pill shape) */}
+        <div className="text-xs sm:text-sm text-neutral-500 font-light tracking-wide min-h-[20px]">
+          {activeAnnouncement ? (
+            <span className="transition-opacity duration-700 ease-in-out">
+              {activeAnnouncement}
+            </span>
+          ) : null}
+        </div>
 
-      {/* 3. Foreground: Centered Single Darker Glass Action Button with cross-fading word */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center p-4 sm:p-6">
+        {/* Minimal, elegant "Watch the Latest" text link with thin font and subtle animated underline/arrow */}
         <button
           type="button"
           onClick={handleNavigateToVideos}
-          style={{
-            background: 'linear-gradient(to bottom, rgba(20, 20, 20, 0.55), rgba(10, 10, 10, 0.35))',
-            backdropFilter: 'blur(20px) saturate(130%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(130%)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.18)',
-            borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
-            borderRadius: '9999px',
-          }}
-          className="group inline-flex items-center justify-center px-8 sm:px-10 py-3.5 sm:py-4 cursor-pointer select-none text-white min-w-[200px] sm:min-w-[240px] transition-all duration-300"
+          className="group inline-flex items-center gap-2 text-xs sm:text-sm font-light tracking-widest uppercase text-neutral-900 hover:text-neutral-500 transition-colors duration-300 cursor-pointer select-none"
         >
-          {/* Single line rotating word with soft cross-fade */}
-          <span
-            className={`transition-opacity duration-300 ease-in-out text-center select-none text-[16px] sm:text-[18px] font-bold text-white tracking-tight leading-none ${
-              isWordFading ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            {activeLabel}
+          <span className="relative pb-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1px] after:bg-neutral-900 group-hover:after:w-full after:transition-all after:duration-300">
+            {lang === 'fr' ? 'Voir les Nouveautés' : 'Watch the Latest'}
           </span>
+          <ArrowRight className="w-3.5 h-3.5 stroke-[1.25] text-neutral-900 group-hover:text-neutral-500 group-hover:translate-x-1 transition-all duration-300" />
         </button>
       </div>
     </div>
   );
 };
-
-

@@ -177,8 +177,8 @@ CREATE POLICY "Allow public all on promo_banner_clips"
 INSERT INTO public.site_settings (key, value)
 VALUES 
   ('admin_passcode', '"1234"'::jsonb),
-  ('promo_banner_config', '{"global_text_overlay": "Special Promotion • Inquire for VIP Privilege Archives", "rotation_interval_sec": 6, "clips": []}'::jsonb),
-  ('creator_profile', '{"name": "Goddess Luzia", "bio": "Welcome to my official VIP sanctuary.", "gallery": []}'::jsonb),
+  ('promo_banner_config', '{"global_text_overlay": "", "rotation_interval_sec": 6, "clips": []}'::jsonb),
+  ('creator_profile', '{"name": "Goddess Luzia", "bio": "Welcome to my official website.", "gallery": []}'::jsonb),
   ('payment_settings', '{"tipfunder": "", "throne": "https://throne.com/goddessluzia", "telegram": "https://t.me/goddessluzia", "x": "https://x.com/goddessluzia"}'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 

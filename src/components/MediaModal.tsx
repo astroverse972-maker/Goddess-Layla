@@ -271,7 +271,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, isOpen, onClose })
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              {(item.tags || ['exclusive', '4k', 'goddessluzia']).map((tag) => (
+              {(item.tags || ['video', 'goddessluzia']).map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1 rounded-full bg-gray-100 text-black text-xs font-semibold border border-gray-200/80"

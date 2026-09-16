@@ -116,29 +116,29 @@ let promoBannerState: {
   rotation_interval_sec: number;
   clips: PromoClipItem[];
 } = {
-  global_text_overlay: "Exclusive previews & custom content by Goddess Luzia",
+  global_text_overlay: "",
   rotation_interval_sec: 6,
   clips: [
     {
       id: "promo-clip-1",
-      title: "Exclusive Video Spotlight",
+      title: "Video Spotlight",
       google_drive_link: "",
       video_url: "https://i.imgur.com/m0CSW44.mp4",
       thumbnail_url: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=1200&auto=format&fit=crop",
-      text_overlay: "Full 4K Uncut Video Available in Collection",
-      announcement_badge: "New Release",
+      text_overlay: "",
+      announcement_badge: "",
       display_order: 1,
       is_active: true,
       created_at: new Date().toISOString()
     },
     {
       id: "promo-clip-2",
-      title: "Custom Video Requests & Highlights",
+      title: "Video Preview",
       google_drive_link: "",
       video_url: "https://i.imgur.com/gK9qN2p.mp4",
       thumbnail_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200&auto=format&fit=crop",
-      text_overlay: "Special promotion this week with code LUZIA20",
-      announcement_badge: "Featured Teaser",
+      text_overlay: "20% off this week with code LUZIA20",
+      announcement_badge: "",
       display_order: 2,
       is_active: true,
       created_at: new Date().toISOString()
@@ -252,7 +252,7 @@ app.post("/api/admin/promo-banner/clip", async (req, res) => {
 
     const newClip: PromoClipItem = {
       id: newId,
-      title: title ? String(title).trim() : "Promo Teaser Clip",
+      title: title ? String(title).trim() : "Promo Clip",
       google_drive_link: cleanDrive,
       video_url: cleanVideo,
       thumbnail_url: thumbnail_url ? String(thumbnail_url).trim() : "",
@@ -968,7 +968,7 @@ async function handlePaymentAction(req: express.Request, res: express.Response, 
       try {
         await supabase.from("access_grants").insert({
           video_id: targetVideoId,
-          video_title: target?.video_title || target?.itemTitle || "Exclusive Media Asset",
+          video_title: target?.video_title || target?.itemTitle || "Video Asset",
           fan_identifier: target?.fan_identifier || target?.fanIdentifier || "Authorized Buyer",
           link_reference: token,
           generated_at: reviewedAt,
@@ -1207,7 +1207,7 @@ let centralSiteSettingsState = {
   telegram_link: "",
   tipfunder_link: "",
   creator_name: "Goddess Luzia",
-  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
+  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's en bestel content veilig via Throne of TipFunder.",
   avatar_url: "",
   about_photos: [] as string[]
 };
@@ -1215,7 +1215,7 @@ let centralSiteSettingsState = {
 let creatorProfileState = {
   name: "Goddess Luzia",
   avatar: "",
-  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
+  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's en bestel content veilig via Throne of TipFunder.",
   gallery: [] as string[]
 };
 
@@ -1667,44 +1667,97 @@ app.get("/api/custom-media", async (req, res) => {
 app.get(["/api/luzia-photos", "/api/gallery-photos"], async (req, res) => {
   try {
     const supabase = getSupabaseServerClient();
-    if (!supabase) {
-      return res.json({ success: false, photos: [], message: "Supabase not configured" });
-    }
+    const photosFound: string[] = [];
 
-    const bucketsToTry = ["luzia", "Luzia"];
-    const foldersToTry = ["Luzia Pic", "luzia pic", "Luzia%20Pic"];
+    const isVideoFile = (filename: string) => {
+      return /\.(mp4|mov|webm|m4v|avi|mkv|wmv|flv|3gp|quicktime)$/i.test(filename.split("?")[0].toLowerCase());
+    };
 
-    for (const b of bucketsToTry) {
-      for (const f of foldersToTry) {
-        const { data, error } = await supabase.storage.from(b).list(f, {
-          limit: 100,
-          sortBy: { column: "name", order: "asc" }
-        });
+    if (supabase) {
+      const bucketsToTry = ["Luzia", "luzia"];
+      const foldersToTry = ["Luzia Pic", "luzia pic", "Luzia%20Pic"];
 
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const files = data.filter(
-            (item: any) => item.name && !item.name.startsWith(".") && !item.name.endsWith("/")
-          );
+      for (const b of bucketsToTry) {
+        for (const f of foldersToTry) {
+          const { data, error } = await supabase.storage.from(b).list(f, {
+            limit: 100,
+            sortBy: { column: "name", order: "asc" }
+          });
 
-          if (files.length > 0) {
-            const urls = files.map((item: any) => {
-              const { data: pubData } = supabase.storage.from(b).getPublicUrl(`${f}/${item.name}`);
-              return pubData.publicUrl;
-            });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const files = data.filter(
+              (item: any) =>
+                item.name &&
+                !item.name.startsWith(".") &&
+                !item.name.endsWith("/") &&
+                !isVideoFile(item.name)
+            );
 
-            return res.json({
-              success: true,
-              bucket: b,
-              folder: f,
-              count: urls.length,
-              photos: urls
-            });
+            if (files.length > 0) {
+              const urls = files.map((item: any) => {
+                const { data: pubData } = supabase.storage.from(b).getPublicUrl(`${f}/${item.name}`);
+                return pubData.publicUrl;
+              });
+              photosFound.push(...urls);
+            }
           }
+        }
+      }
+
+      // If storage listing returned empty (e.g. anon RLS constraint on storage.objects), check site_settings
+      if (photosFound.length === 0) {
+        try {
+          const { data: setRow } = await supabase
+            .from("site_settings")
+            .select("value")
+            .in("key", ["about_photos", "gallery_photos", "creator_profile"])
+            .limit(5);
+
+          if (Array.isArray(setRow)) {
+            for (const r of setRow) {
+              if (Array.isArray(r.value)) {
+                for (const p of r.value) {
+                  if (typeof p === "string" && p.startsWith("http") && !isVideoFile(p)) {
+                    photosFound.push(p);
+                  }
+                }
+              } else if (r.value && Array.isArray(r.value.gallery)) {
+                for (const p of r.value.gallery) {
+                  if (typeof p === "string" && p.startsWith("http") && !isVideoFile(p)) {
+                    photosFound.push(p);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // ignore
         }
       }
     }
 
-    return res.json({ success: true, photos: [], count: 0 });
+    // Default known photo(s) from Luzia Pic folder in Luzia Supabase bucket
+    const defaultSupabasePhotos = [
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115278_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115276_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115272_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115263_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115249_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115248_y.jpg",
+      "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/photo_5267450103906115245_y.jpg"
+    ];
+
+    const allPhotos = Array.from(new Set([...photosFound, ...defaultSupabasePhotos])).filter(
+      (url) => !isVideoFile(url)
+    );
+
+    return res.json({
+      success: true,
+      bucket: "Luzia",
+      folder: "Luzia Pic",
+      count: allPhotos.length,
+      photos: allPhotos
+    });
   } catch (err: any) {
     console.warn("Error fetching luzia gallery photos:", err);
     return res.status(500).json({ success: false, error: err.message, photos: [] });
@@ -1927,7 +1980,7 @@ app.post("/api/admin/trigger-github-action", async (req, res) => {
 
   const result = await triggerGitHubVideoProcessing({
     id: submissionId || `sub-${Date.now()}`,
-    title: title || "Exclusive Video",
+    title: title || "Video",
     price: price || "25.00",
     video_storage_path: videoStoragePath
   });
@@ -2046,8 +2099,8 @@ app.post("/api/custom-media", async (req, res) => {
 
     const rawTitle = title ? String(title).trim() : "";
     const rawDriveLink = googleDriveLink || (isUrlOrDriveLinkServer(rawTitle) ? rawTitle : "");
-    const safeTitle = isUrlOrDriveLinkServer(rawTitle) ? "Exclusive Masterclass Session" : (rawTitle || "Exclusive Masterclass Session");
-    const safeDesc = cleanServerDescription(description, "Exclusive video published by Goddess Luzia.");
+    const safeTitle = isUrlOrDriveLinkServer(rawTitle) ? "Video Session" : (rawTitle || "Video Session");
+    const safeDesc = cleanServerDescription(description, "Video published by Goddess Luzia.");
 
     const storagePath = video_storage_path || videoStoragePath;
     const finalVideoUrl = rawDriveLink || videoUrl || previewUrl || (storagePath ? `supabase://${storagePath}` : "");
@@ -2061,8 +2114,8 @@ app.post("/api/custom-media", async (req, res) => {
       id: `custom-vid-${Date.now()}`,
       title: safeTitle,
       titleEn: safeTitle,
-      category: category ? category.trim() : "Goddess Exclusive",
-      categoryEn: category ? category.trim() : "Goddess Exclusive",
+      category: category ? category.trim() : "Video",
+      categoryEn: category ? category.trim() : "Video",
       price: parseFloat(price) || 20.00,
       previewUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
       videoUrl: finalVideoUrl.trim() || (storagePath ? `supabase://${storagePath}` : ""),
@@ -2074,7 +2127,7 @@ app.post("/api/custom-media", async (req, res) => {
       duration: duration || "Full length",
       description: safeDesc,
       descriptionEn: safeDesc,
-      tags: Array.isArray(tags) ? tags : ["new", "goddessluzia", "exclusive"],
+      tags: Array.isArray(tags) ? tags : ["new", "goddessluzia"],
       createdAt: new Date().toISOString()
     };
 
@@ -2222,7 +2275,7 @@ const VALID_VIP_PASSCODES = new Set([
   "MILANA2026",
   "QUEEN-VIP",
   "GODDESS-VIP",
-  "SANCTUARY-VIP",
+  "ACCESS-VIP",
   "REINE-VIP",
   "DOMINION-VIP",
   "PAID2026",

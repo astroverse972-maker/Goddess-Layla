@@ -36,7 +36,7 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
             Support & Payment
           </h2>
           <p className="text-sm sm:text-base text-gray-600 font-medium max-w-lg mx-auto">
-            Official and secure payment options for {creatorName}.
+            Payment options for {creatorName}.
           </p>
         </div>
 
@@ -53,9 +53,6 @@ export const TributeSection: React.FC<TributeSectionProps> = () => {
                     Throne Wishlist & Direct Gifts
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-white bg-neutral-900 border border-white/20 px-2 py-0.5 rounded">
-                  RECOMMENDED
-                </span>
               </div>
               <p className="text-xs text-neutral-300">
                 Send gifts or support directly through Throne.

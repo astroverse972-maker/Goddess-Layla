@@ -1,6 +1,6 @@
 {
   "name": "Goddess Luzia",
-  "description": "Official VIP sanctuary & media portal of Goddess Luzia - Throne, Google Drive asset delivery, and centralized VIP video access.",
+  "description": "Official website of Goddess Luzia. Video collection, previews, and direct links.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

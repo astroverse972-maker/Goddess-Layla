@@ -12,7 +12,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenShop, lang }) => {
   const { siteSettings, paymentSettings, creatorProfile } = useSiteSettings();
 
   const creatorName = siteSettings.creator_name || creatorProfile.name || 'Goddess Luzia';
-  const avatarUrl = siteSettings.avatar_url || creatorProfile.avatar;
+  const avatarUrl = siteSettings.avatar_url || creatorProfile.avatar || "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/ifABElLS_400x400.jpg";
   const telegramLink = siteSettings.telegram_link || paymentSettings.telegram;
   const throneLink = siteSettings.throne_link || paymentSettings.throne;
   const tipfunderLink = siteSettings.tipfunder_link || paymentSettings.tipfunder;

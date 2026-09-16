@@ -132,8 +132,8 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
   const [videoTitle, setVideoTitle] = useState('');
   const [videoPrice, setVideoPrice] = useState('35.00');
   const [videoDuration, setVideoDuration] = useState('18:45');
-  const [videoTags, setVideoTags] = useState('exclusive, 4k, goddessluzia');
-  const [videoDescription, setVideoDescription] = useState('Exclusive encrypted video archive. Delivered immediately upon authorized transaction.');
+  const [videoTags, setVideoTags] = useState('new, goddessluzia');
+  const [videoDescription, setVideoDescription] = useState('Video by Goddess Luzia.');
   const [driveUrl, setDriveUrl] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [trailerUrl, setTrailerUrl] = useState('');
@@ -266,7 +266,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: newClipTitle.trim() || 'Promo Teaser Clip',
+          title: newClipTitle.trim() || 'Promo Clip',
           google_drive_link: newClipDriveLink.trim(),
           video_url: newClipVideoUrl.trim() || newClipDriveLink.trim(),
           thumbnail_url: newClipThumbnail.trim(),
@@ -1139,7 +1139,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                             <div className="space-y-1.5 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 text-xs">
                                 <span className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-white font-bold truncate">
-                                  {reqItem.video_title || 'Exclusive Archive'}
+                                  {reqItem.video_title || 'Video'}
                                 </span>
                                 <span className="text-white font-bold bg-neutral-900 px-2 py-0.5 rounded border border-white/10">
                                   {reqItem.amount || '35.00 €'}
@@ -1493,7 +1493,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                       </button>
                     </div>
                     <p className="text-xs text-neutral-400 font-mono">
-                      Apple-stijl automatische videocarrousel op de homepage. Voeg korte teaser clips toe via Google Drive links en beheer aankondigingen of acties.
+                      Automatische videocarrousel op de homepage. Voeg korte videoclips toe via Google Drive links en beheer acties.
                     </p>
                   </div>
 
@@ -1599,7 +1599,7 @@ export const MistressAdminModal: React.FC<MistressAdminModalProps> = ({
                             type="text"
                             value={newClipTitle}
                             onChange={(e) => setNewClipTitle(e.target.value)}
-                            placeholder="bijv. Video Teaser 01"
+                            placeholder="bijv. Video Clip 01"
                             className="w-full min-h-[44px] bg-white/[0.04] border border-white/10 focus:border-white rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                           />
                         </div>

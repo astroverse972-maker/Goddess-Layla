@@ -63,8 +63,8 @@ const defaultCentralSettings: CentralSiteSettings = {
   telegram_link: SOCIAL_LINKS.telegram || "",
   tipfunder_link: SOCIAL_LINKS.tipfunder || "",
   creator_name: "Goddess Luzia",
-  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
-  avatar_url: "",
+  about_text: "Welkom op de officiële website van Goddess Luzia. Bekijk video's en bestel content veilig via Throne of TipFunder.",
+  avatar_url: "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/ifABElLS_400x400.jpg",
   about_photos: [],
 
   // Aliases
@@ -73,8 +73,8 @@ const defaultCentralSettings: CentralSiteSettings = {
   telegram: SOCIAL_LINKS.telegram || "",
   tipfunder: SOCIAL_LINKS.tipfunder || "",
   name: "Goddess Luzia",
-  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's, teasers en bestel content veilig via Throne of TipFunder.",
-  avatar: "",
+  bio: "Welkom op de officiële website van Goddess Luzia. Bekijk video's en bestel content veilig via Throne of TipFunder.",
+  avatar: "https://pnpmpwkdlbbmsxqwwnjc.supabase.co/storage/v1/object/public/Luzia/Luzia%20Pic/ifABElLS_400x400.jpg",
   gallery: []
 };
 
