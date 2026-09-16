@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import { getSupabaseServerClient } from "./src/lib/supabaseServer";
+import { getSignedFileUrl } from "./server/backblaze";
 
 dotenv.config();
 
@@ -463,6 +464,37 @@ app.get("/api/admin/auth-status", async (req, res) => {
     username: creds ? creds.username : null,
     isAuthenticated
   });
+});
+
+// ====================================================================
+// TEMPORARY: Backblaze B2 Signed URL Verification Endpoint (Admin Only)
+// ====================================================================
+app.get("/api/admin/test-b2-signed-url", async (req, res) => {
+  if (!checkIsAdmin(req)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+
+  const fileKey = req.query.fileKey;
+  if (!fileKey || typeof fileKey !== "string") {
+    return res.status(400).json({ error: "Query parameter 'fileKey' is required (e.g. ?fileKey=sample.mp4)." });
+  }
+
+  try {
+    // 5-minute expiry = 300 seconds
+    const signedUrl = await getSignedFileUrl(fileKey, 300);
+    return res.json({
+      success: true,
+      fileKey,
+      expiresInSeconds: 300,
+      signedUrl,
+    });
+  } catch (error: any) {
+    console.error("[B2 TEST ERROR]", error);
+    return res.status(500).json({
+      error: error.message || "Failed to generate Backblaze B2 signed URL.",
+      details: error.name || undefined,
+    });
+  }
 });
 
 // POST /api/admin/setup - Initial first-time admin setup in Supabase
